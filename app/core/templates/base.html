@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8" />
+        <title>{{ titulo }}</title>
+        <style>
+            @page {
+                size: A4;
+                margin: 2cm 1.5cm;
+                @top-left {
+                    content: "{{ titulo }}";
+                    font-size: 9pt;
+                    color: #6b7280;
+                }
+                @top-right {
+                    content: "{{ data_geracao }}";
+                    font-size: 9pt;
+                    color: #6b7280;
+                }
+                @bottom-center {
+                    content: "Página " counter(page) " de " counter(pages);
+                    font-size: 9pt;
+                    color: #6b7280;
+                }
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family:
+                    -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+                font-size: 10pt;
+                color: #1f2937;
+                line-height: 1.5;
+            }
+
+            /* Cabeçalho do relatório */
+            .cabecalho {
+                border-bottom: 3px solid #2563eb;
+                padding-bottom: 15px;
+                margin-bottom: 25px;
+            }
+
+            .cabecalho h1 {
+                color: #2563eb;
+                font-size: 22pt;
+                font-weight: 700;
+                margin-bottom: 5px;
+            }
+
+            .cabecalho .subtitulo {
+                color: #6b7280;
+                font-size: 11pt;
+            }
+
+            /* Seções */
+            .secao {
+                margin-bottom: 25px;
+            }
+
+            .secao-titulo {
+                background: #f3f4f6;
+                color: #1f2937;
+                padding: 8px 12px;
+                font-size: 11pt;
+                font-weight: 600;
+                border-left: 4px solid #2563eb;
+                margin-bottom: 12px;
+            }
+
+            /* Tabelas */
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 15px;
+                font-size: 9pt;
+            }
+
+            table thead th {
+                background: #1f2937;
+                color: white;
+                padding: 8px 10px;
+                text-align: left;
+                font-weight: 600;
+            }
+
+            table tbody td {
+                padding: 7px 10px;
+                border-bottom: 1px solid #e5e7eb;
+            }
+
+            table tbody tr:nth-child(even) {
+                background: #f9fafb;
+            }
+
+            /* Cards de resumo */
+            .cards {
+                display: flex;
+                gap: 12px;
+                margin-bottom: 20px;
+            }
+
+            .card {
+                flex: 1;
+                background: #f3f4f6;
+                border-left: 4px solid #2563eb;
+                padding: 12px 15px;
+                border-radius: 4px;
+            }
+
+            .card-label {
+                color: #6b7280;
+                font-size: 8pt;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .card-valor {
+                font-size: 18pt;
+                font-weight: 700;
+                color: #1f2937;
+                margin-top: 4px;
+            }
+
+            /* Badges */
+            .badge {
+                display: inline-block;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 8pt;
+                font-weight: 600;
+            }
+
+            .badge-sucesso {
+                background: #d1fae5;
+                color: #065f46;
+            }
+            .badge-erro {
+                background: #fee2e2;
+                color: #991b1b;
+            }
+            .badge-info {
+                background: #dbeafe;
+                color: #1e40af;
+            }
+            .badge-aviso {
+                background: #fef3c7;
+                color: #92400e;
+            }
+
+            /* Rodapé */
+            .rodape {
+                margin-top: 30px;
+                padding-top: 15px;
+                border-top: 1px solid #e5e7eb;
+                color: #9ca3af;
+                font-size: 8pt;
+                text-align: center;
+            }
+
+            /* Utilitários */
+            .texto-direita {
+                text-align: right;
+            }
+            .texto-centro {
+                text-align: center;
+            }
+            .negrito {
+                font-weight: 600;
+            }
+            .destaque {
+                color: #2563eb;
+            }
+        </style>
+        {% block estilos_extras %}{% endblock %}
+    </head>
+    <body>
+        <div class="cabecalho">
+            <h1>{{ titulo }}</h1>
+            {% if subtitulo %}
+            <div class="subtitulo">{{ subtitulo }}</div>
+            {% endif %}
+        </div>
+
+        {% block conteudo %}{% endblock %}
+
+        <div class="rodape">Gerado pelo Nexus em {{ data_geracao }}</div>
+    </body>
+</html>

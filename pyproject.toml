@@ -1,0 +1,15 @@
+[project]
+name = "nexus"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "cryptography>=49.0.0",
+    "fastapi[standard]>=0.138.0",
+    "jinja2>=3.1.6",
+    "psycopg[binary]>=3.3.4",
+    "sqlalchemy>=2.0.51",
+    "sqlalchemy-firebird>=2.2.0",
+    "weasyprint>=69.0",
+]

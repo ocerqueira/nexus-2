@@ -1,0 +1,99 @@
+{% extends "base.html" %} {% block conteudo %}
+
+<!-- Cards de resumo -->
+<div class="cards">
+    <div class="card">
+        <div class="card-label">Total Encontrado</div>
+        <div class="card-valor">{{ total }}</div>
+    </div>
+
+    <div class="card">
+        <div class="card-label">Apenas Ativas?</div>
+        <div class="card-valor">
+            {% if filtros_aplicados.apenas_ativas %}Sim{% else %}Não{% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-label">Filtro de Tipo</div>
+        <div class="card-valor" style="font-size: 14pt">
+            {{ filtros_aplicados.tipo_banco }}
+        </div>
+    </div>
+</div>
+
+<!-- Tabela detalhada -->
+<div class="secao">
+    <div class="secao-titulo">Conexões Cadastradas</div>
+
+    {% if conexoes %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Tipo</th>
+                <th>Host</th>
+                <th>Porta</th>
+                <th>Banco</th>
+                <th class="texto-centro">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for conexao in conexoes %}
+            <tr>
+                <td>{{ conexao.id }}</td>
+                <td class="negrito">{{ conexao.nome }}</td>
+                <td>{{ conexao.tipo }}</td>
+                <td>{{ conexao.host }}</td>
+                <td>{{ conexao.porta }}</td>
+                <td>{{ conexao.banco }}</td>
+                <td class="texto-centro">
+                    {% if conexao.ativo is defined and conexao.ativo %}
+                    <span class="badge badge-sucesso">Ativa</span>
+                    {% elif conexao.ativo is defined %}
+                    <span class="badge badge-erro">Inativa</span>
+                    {% else %}
+                    <span class="badge badge-sucesso">Ativa</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #6b7280; font-style: italic">
+        Nenhuma conexão encontrada com os filtros aplicados.
+    </p>
+    {% endif %}
+</div>
+
+<!-- Resumo por tipo -->
+<div class="secao">
+    <div class="secao-titulo">Resumo por Tipo de Banco</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Tipo</th>
+                <th class="texto-centro">Total</th>
+                <th class="texto-centro">Ativas</th>
+                <th class="texto-centro">Inativas</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for resumo in resumo_por_tipo %}
+            <tr>
+                <td class="negrito">{{ resumo.tipo }}</td>
+                <td class="texto-centro">{{ resumo.total }}</td>
+                <td class="texto-centro destaque negrito">
+                    {{ resumo.ativas }}
+                </td>
+                <td class="texto-centro">{{ resumo.inativas }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

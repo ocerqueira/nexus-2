@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8" />
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                color: #333;
+                line-height: 1.5;
+            }
+            .header {
+                background: #f59e0b;
+                color: white;
+                padding: 20px;
+                border-radius: 4px;
+            }
+            .header h1 {
+                margin: 0;
+                font-size: 20px;
+            }
+            .resumo {
+                background: #fef3c7;
+                padding: 12px 15px;
+                border-left: 4px solid #f59e0b;
+                margin: 20px 0;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 15px;
+            }
+            th {
+                background: #1f2937;
+                color: white;
+                padding: 10px;
+                text-align: left;
+            }
+            td {
+                padding: 8px 10px;
+                border-bottom: 1px solid #e5e7eb;
+            }
+            tr:nth-child(even) {
+                background: #f9fafb;
+            }
+            .footer {
+                color: #9ca3af;
+                font-size: 12px;
+                margin-top: 25px;
+                text-align: center;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>⚠️ {{ titulo }}</h1>
+        </div>
+
+        <div class="resumo">
+            {% if total == 1 %}
+            <strong>1 conexão</strong> está inativa no Nexus. {% else %}
+            <strong>{{ total }} conexões</strong> estão inativas no Nexus. {%
+            endif %}
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Tipo</th>
+                    <th>Host</th>
+                    <th>Porta</th>
+                    <th>Banco</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for conexao in dados %}
+                <tr>
+                    <td><strong>{{ conexao.nome }}</strong></td>
+                    <td>{{ conexao.tipo }}</td>
+                    <td>{{ conexao.host }}</td>
+                    <td>{{ conexao.porta }}</td>
+                    <td>{{ conexao.banco }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="footer">
+            Notificação gerada pelo Nexus em {{ data_geracao }}
+        </div>
+    </body>
+</html>

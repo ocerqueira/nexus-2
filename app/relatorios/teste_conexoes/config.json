@@ -1,0 +1,21 @@
+{
+  "titulo": "Teste de Conexões",
+  "descricao": "Lista todas as conexões cadastradas no Nexus. Usado para validar a infraestrutura de relatórios.",
+  "categoria": "sistema",
+  "parametros": [
+    {
+      "nome": "apenas_ativas",
+      "tipo": "boolean",
+      "obrigatorio": false,
+      "padrao": true,
+      "rotulo": "Listar apenas conexões ativas?"
+    },
+    {
+      "nome": "tipo_banco",
+      "tipo": "string",
+      "obrigatorio": false,
+      "rotulo": "Filtrar por tipo de banco",
+      "valores_permitidos": ["postgres", "firebird", "mysql"]
+    }
+  ]
+}

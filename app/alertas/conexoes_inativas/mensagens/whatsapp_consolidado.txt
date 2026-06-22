@@ -1,0 +1,14 @@
+⚠️ *{{ titulo }}*
+
+{% if total == 1 %}
+1 conexão está inativa no Nexus:
+{% else %}
+{{ total }} conexões estão inativas no Nexus:
+{% endif %}
+
+{% for conexao in dados %}
+- *{{ conexao.nome }}* ({{ conexao.tipo }})
+  {{ conexao.host }}:{{ conexao.porta }}
+{% endfor %}
+
+_Verifique e reative ou remova do catálogo._

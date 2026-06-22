@@ -1,0 +1,1 @@
+[{{ severidade | upper }}] {{ titulo }} - {{ total }} detectada(s)
