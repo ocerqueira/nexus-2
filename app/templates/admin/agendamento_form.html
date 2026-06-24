@@ -44,13 +44,11 @@
     <div>
       <label class="block text-xs font-medium text-slate-600 mb-1">Frequência<span class="text-red-400 ml-0.5">*</span></label>
       <select name="frequencia" required class="{{ input_cls }}"
-              onchange="
-                document.getElementById('ag-dia-semana').style.display = this.value === 'semanal' ? '' : 'none';
-                document.getElementById('ag-dia-mes').style.display    = this.value === 'mensal'  ? '' : 'none';
-              ">
+              onchange="onFreqChange(this.value)">
         <option value="diaria">Diária</option>
         <option value="semanal">Semanal</option>
         <option value="mensal">Mensal</option>
+        <option value="intervalo">Intervalo (a cada X min)</option>
       </select>
     </div>
 
@@ -69,9 +67,15 @@
       <input type="number" name="dia_mes" min="1" max="31" placeholder="1–31" class="{{ input_cls }}">
     </div>
 
-    <div>
+    <div id="ag-intervalo" style="display:none">
+      <label class="block text-xs font-medium text-slate-600 mb-1">Intervalo (minutos)<span class="text-red-400 ml-0.5">*</span></label>
+      <input type="number" name="intervalo_minutos" min="1" placeholder="10" class="{{ input_cls }}">
+      <p class="text-xs text-slate-400 mt-0.5">Ex: 10 = executa a cada 10 minutos</p>
+    </div>
+
+    <div id="ag-horarios">
       <label class="block text-xs font-medium text-slate-600 mb-1">Horários<span class="text-red-400 ml-0.5">*</span></label>
-      <input type="text" name="horarios_str" placeholder="08:00, 18:00" required class="{{ input_cls }}">
+      <input type="text" name="horarios_str" placeholder="08:00, 18:00" class="{{ input_cls }}" id="ag-horarios-input">
       <p class="text-xs text-slate-400 mt-0.5">Separados por vírgula</p>
     </div>
 
@@ -123,5 +127,11 @@ function syncUsuarioId(input) {
   const list = document.getElementById('form-usuarios-list');
   const opt = Array.from(list.options).find(o => o.value === input.value);
   document.getElementById('form-usuario-id').value = opt ? opt.dataset.id : '';
+}
+function onFreqChange(val) {
+  document.getElementById('ag-dia-semana').style.display  = val === 'semanal'   ? '' : 'none';
+  document.getElementById('ag-dia-mes').style.display     = val === 'mensal'    ? '' : 'none';
+  document.getElementById('ag-intervalo').style.display   = val === 'intervalo' ? '' : 'none';
+  document.getElementById('ag-horarios').style.display    = val === 'intervalo' ? 'none' : '';
 }
 </script>

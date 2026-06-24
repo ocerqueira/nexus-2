@@ -713,7 +713,7 @@ def _agendamentos_db(busca: str = "", tipo_filtro: str = "",
         rows = c.execute(text(f"""
             SELECT a.id, u.id AS usuario_id, u.nome AS usuario_nome, a.tipo_recurso,
                    COALESCE(r.titulo, al.titulo) AS recurso_nome,
-                   a.frequencia, a.horarios, a.canais, a.apenas_dias_uteis,
+                   a.frequencia, a.horarios, a.intervalo_minutos, a.canais, a.apenas_dias_uteis,
                    a.proximo_envio, a.ativo
             FROM agendamentos a
             LEFT JOIN usuarios u ON u.id = a.usuario_id
@@ -729,9 +729,12 @@ def _agendamentos_db(busca: str = "", tipo_filtro: str = "",
         d = dict(r)
         uid = d.get("usuario_id") or 0
         horarios_raw = d.get("horarios") or []
-        d["horarios_str"] = ", ".join(
-            f'{h["hora"]:02d}:{h["minuto"]:02d}' for h in horarios_raw
-        ) if isinstance(horarios_raw, list) else str(horarios_raw)
+        if d.get("frequencia") == "intervalo":
+            d["horarios_str"] = f'a cada {d.get("intervalo_minutos")} min'
+        else:
+            d["horarios_str"] = ", ".join(
+                f'{h["hora"]:02d}:{h["minuto"]:02d}' for h in horarios_raw
+            ) if isinstance(horarios_raw, list) else str(horarios_raw)
         d["proximo_envio_fmt"] = _fmt_dt(d.get("proximo_envio"))
         canais = d.get("canais") or []
         d["canais"] = canais if isinstance(canais, list) else []
@@ -782,10 +785,11 @@ def admin_agendamentos_criar(
     tipo_recurso: Annotated[str, Form()],
     recurso_id: Annotated[int, Form()],
     frequencia: Annotated[str, Form()],
-    horarios_str: Annotated[str, Form()],
+    horarios_str: Annotated[str | None, Form()] = None,
     timezone: Annotated[str, Form()] = "America/Sao_Paulo",
     dia_semana: Annotated[int | None, Form()] = None,
     dia_mes: Annotated[int | None, Form()] = None,
+    intervalo_minutos: Annotated[int | None, Form()] = None,
     apenas_dias_uteis: Annotated[str | None, Form()] = None,
     canais: Annotated[list[str] | None, Form()] = None,
 ):
@@ -800,9 +804,14 @@ def admin_agendamentos_criar(
 
     if not canais:
         return _ctx("Selecione ao menos um canal.")
-    horarios = _parse_horarios(horarios_str)
-    if not horarios:
-        return _ctx("Horários inválidos. Use formato HH:MM separados por vírgula.")
+    if frequencia == "intervalo":
+        if not intervalo_minutos or intervalo_minutos < 1:
+            return _ctx("Frequência 'intervalo' exige intervalo_minutos >= 1.")
+        horarios = []
+    else:
+        horarios = _parse_horarios(horarios_str or "")
+        if not horarios:
+            return _ctx("Horários inválidos. Use formato HH:MM separados por vírgula.")
     if frequencia == "semanal" and not dia_semana:
         return _ctx("Frequência semanal exige dia da semana.")
     if frequencia == "mensal" and not dia_mes:
@@ -812,6 +821,7 @@ def admin_agendamentos_criar(
         proximo = calcular_proximo_envio({
             "frequencia": frequencia, "horarios": horarios,
             "dia_semana": dia_semana, "dia_mes": dia_mes,
+            "intervalo_minutos": intervalo_minutos,
             "apenas_dias_uteis": uteis, "timezone": timezone,
         })
     except (ValueError, KeyError) as e:
@@ -821,14 +831,15 @@ def admin_agendamentos_criar(
             c.execute(text("""
                 INSERT INTO agendamentos (
                     usuario_id, tipo_recurso, recurso_id, frequencia, dia_semana, dia_mes,
-                    horarios, apenas_dias_uteis, timezone, parametros, canais, proximo_envio
+                    intervalo_minutos, horarios, apenas_dias_uteis, timezone, parametros, canais, proximo_envio
                 ) VALUES (
                     :usuario_id, :tipo_recurso, :recurso_id, :frequencia, :dia_semana, :dia_mes,
-                    :horarios, :apenas_dias_uteis, :timezone, :parametros, :canais, :proximo_envio
+                    :intervalo_minutos, :horarios, :apenas_dias_uteis, :timezone, :parametros, :canais, :proximo_envio
                 )
             """), {
                 "usuario_id": usuario_id, "tipo_recurso": tipo_recurso, "recurso_id": recurso_id,
                 "frequencia": frequencia, "dia_semana": dia_semana, "dia_mes": dia_mes,
+                "intervalo_minutos": intervalo_minutos,
                 "horarios": json.dumps(horarios), "apenas_dias_uteis": uteis, "timezone": timezone,
                 "parametros": json.dumps({}), "canais": json.dumps(canais), "proximo_envio": proximo,
             })

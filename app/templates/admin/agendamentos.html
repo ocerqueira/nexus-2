@@ -32,7 +32,7 @@
 
   {# Frequência #}
   <div class="flex gap-1">
-    {% for val, label in [("", "Qualquer"), ("diaria", "Diária"), ("semanal", "Semanal"), ("mensal", "Mensal")] %}
+    {% for val, label in [("", "Qualquer"), ("diaria", "Diária"), ("semanal", "Semanal"), ("mensal", "Mensal"), ("intervalo", "Intervalo")] %}
     <button type="button"
             class="px-2.5 py-1.5 text-xs rounded-full border transition-colors
                    {{ 'bg-slate-700 text-white border-slate-700' if freq_filtro == val else 'bg-white text-slate-600 border-slate-200 hover:border-slate-400' }}"
