@@ -20,8 +20,11 @@
         size: A4 landscape;
         margin: 2.45cm 1.1cm 1.45cm 1.1cm;
         @top-left   { content: none; }
-        @top-center { content: none; }
         @top-right  { content: none; }
+        @top-center {
+            content: element(cabecalho-running);
+            vertical-align: bottom;
+        }
         @bottom-left {
             content: "nexus";
             font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
@@ -57,24 +60,20 @@
     .rodape { display: none; }
 
     /* ── Running header ────────────────────────────────────────────── */
-    /* position: fixed repete em cada página e posiciona relativo à folha (não ao content area) */
-    .running-header {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-    }
+    .running-header { position: running(cabecalho-running); display: block; width: 100%; }
 
     .cab-wrap {
+        display: -weasy-flex;
+        display: flex;
+        align-items: center;
         width: 100%;
+        box-sizing: border-box;
         background: var(--preto);
         border-bottom: 3px solid var(--amarelo);
-        display: table;
-        table-layout: fixed;
         padding: 7px 12px;
     }
-    .cab-marca { display: table-cell; width: 38%; vertical-align: middle; white-space: nowrap; }
-    .cab-info  { display: table-cell; vertical-align: middle; text-align: right; }
+    .cab-marca { flex: 0 0 38%; white-space: nowrap; }
+    .cab-info  { flex: 1; text-align: right; }
 
     .wordmark {
         font-weight: 800;
