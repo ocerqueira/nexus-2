@@ -103,7 +103,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('⚙️ Config (Edite aqui)').item.json.NEXUS_URL + '/alertas/' + $json.recurso_nome + '/verificar?forcar=true' }}",
+        "url": "={{ $('⚙️ Config (Edite aqui)').first().json.NEXUS_URL + '/alertas/' + $json.recurso_nome + '/verificar?forcar=true' }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ parametros: $json.parametros }) }}",
@@ -165,11 +165,11 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_URL + '/message/sendText/' + $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_INSTANCE }}",
+        "url": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_URL + '/message/sendText/' + $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_INSTANCE }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_API_KEY }}" }
+            { "name": "apikey", "value": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_API_KEY }}" }
           ]
         },
         "sendBody": true,
@@ -185,15 +185,15 @@
     },
     {
       "parameters": {
-        "fromEmail": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_USER }}",
+        "fromEmail": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_USER }}",
         "toEmail": "={{ $json.email }}",
         "subject": "={{ $json.mensagem_email_assunto }}",
         "html": "={{ $json.mensagem_email_html }}",
         "options": {
-          "host": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_HOST }}",
-          "port": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_PORT }}",
-          "user": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_USER }}",
-          "password": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_PASSWORD }}",
+          "host": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_HOST }}",
+          "port": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_PORT }}",
+          "user": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_USER }}",
+          "password": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_PASSWORD }}",
           "ssl": false
         }
       },
@@ -207,7 +207,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('⚙️ Config (Edite aqui)').item.json.NEXUS_URL + '/relatorios/' + $json.recurso_nome + '/solicitar' }}",
+        "url": "={{ $('⚙️ Config (Edite aqui)').first().json.NEXUS_URL + '/relatorios/' + $json.recurso_nome + '/solicitar' }}",
         "sendQueryParameters": true,
         "queryParameters": {
           "parameters": [{ "name": "formato", "value": "pdf" }]
@@ -239,11 +239,11 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_URL + '/message/sendMedia/' + $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_INSTANCE }}",
+        "url": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_URL + '/message/sendMedia/' + $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_INSTANCE }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_API_KEY }}" }
+            { "name": "apikey", "value": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_API_KEY }}" }
           ]
         },
         "sendBody": true,
@@ -255,19 +255,20 @@
       "name": "Evolution — sendMedia PDF",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2000, 500]
+      "position": [2000, 500],
+      "alwaysOutputData": false
     },
     {
       "parameters": {
-        "fromEmail": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_USER }}",
+        "fromEmail": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_USER }}",
         "toEmail": "={{ $json.usuario_email }}",
         "subject": "=Relatório: {{ $json.recurso_nome.replace(/_/g, ' ') }}",
         "text": "=Segue em anexo o relatório {{ $json.recurso_nome.replace(/_/g, ' ') }} gerado pelo Nexus.",
         "options": {
-          "host": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_HOST }}",
-          "port": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_PORT }}",
-          "user": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_USER }}",
-          "password": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_PASSWORD }}",
+          "host": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_HOST }}",
+          "port": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_PORT }}",
+          "user": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_USER }}",
+          "password": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_PASSWORD }}",
           "ssl": false,
           "attachments": [
             {
@@ -288,7 +289,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('⚙️ Config (Edite aqui)').item.json.NEXUS_URL + '/agendamentos/' + $('Split Out — agendamentos').item.json.id + '/marcar-executado' }}",
+        "url": "={{ $('⚙️ Config (Edite aqui)').first().json.NEXUS_URL + '/agendamentos/' + $('Split Out — agendamentos').first().json.id + '/marcar-executado' }}",
         "options": {}
       },
       "id": "marcar-executado",
