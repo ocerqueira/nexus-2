@@ -17,10 +17,10 @@
 
     /* ── @page: paisagem + rodapé de marca (sobrescreve base.html) ─── */
     @page {
-        size: A4 landscape;
+        size: 297mm 210mm;  /* A4 landscape explícito — mais confiável que "A4 landscape" no WeasyPrint */
         margin: 2.45cm 1.1cm 1.45cm 1.1cm;
-        @top-left   { content: none; }
-        @top-right  { content: none; }
+        @top-left   { content: none; width: 0; }
+        @top-right  { content: none; width: 0; }
         @top-center {
             content: element(cabecalho-running);
             vertical-align: bottom;
