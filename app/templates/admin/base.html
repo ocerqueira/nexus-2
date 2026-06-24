@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nexus Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+  <style>
+    .htmx-request { opacity: .6; pointer-events: none; transition: opacity .15s; }
+    dialog::backdrop { background: rgba(0,0,0,.45); }
+    .nav-link.active { background: #eef2ff; color: #4338ca; }
+    .nav-link.active svg { color: #4338ca; }
+  </style>
+</head>
+<body class="bg-slate-100 text-sm text-slate-800">
+
+  {# ── Sidebar ─────────────────────────────────────────────── #}
+  <aside class="fixed inset-y-0 left-0 w-56 bg-white border-r flex flex-col z-30">
+
+    <div class="px-5 py-4 border-b flex items-center gap-2.5">
+      <div class="p-1.5 bg-indigo-600 rounded-lg">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="font-bold text-slate-800 text-sm leading-tight">Nexus</div>
+        <div class="text-xs text-slate-400">Painel Admin</div>
+      </div>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+      {% set links = [
+        ("dashboard",    "Dashboard",     "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"),
+        ("relatorios",   "Relatórios",    "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"),
+        ("alertas",      "Alertas",       "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"),
+        ("conexoes",     "Conexões",      "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"),
+        ("usuarios",     "Usuários",      "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"),
+        ("agendamentos", "Agendamentos",  "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"),
+        ("permissoes",   "Permissões",    "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"),
+        ("testes",       "Testes",        "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"),
+        ("historico",    "Histórico",     "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"),
+      ] %}
+      {% for slug, label, icon_path in links %}
+      <button class="nav-link w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 text-sm transition-colors"
+              onclick="setActive(this)"
+              hx-get="/admin/{{ slug }}" hx-target="#main" hx-swap="innerHTML">
+        <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ icon_path }}"/>
+        </svg>
+        {{ label }}
+      </button>
+      {% endfor %}
+    </nav>
+
+    <div class="p-3 border-t space-y-1.5">
+      <button title="Sincronizar relatórios e alertas do filesystem"
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium bg-slate-50 hover:bg-slate-100
+                     text-slate-600 border border-slate-200 rounded-lg transition-colors"
+              hx-post="/admin/sincronizar" hx-target="#sync-msg" hx-swap="innerHTML">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Sync Filesystem
+      </button>
+      <button title="Sincronizar usuários do Active Directory"
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium bg-indigo-50 hover:bg-indigo-100
+                     text-indigo-700 border border-indigo-200 rounded-lg transition-colors"
+              hx-post="/admin/ad/sincronizar" hx-target="#sync-msg" hx-swap="innerHTML">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        Sync Active Directory
+      </button>
+      <div id="sync-msg" class="text-xs text-slate-500 px-1 min-h-4"></div>
+      <a href="/docs" target="_blank"
+         class="block text-center text-xs text-slate-400 hover:text-indigo-500 py-1">Swagger API →</a>
+    </div>
+  </aside>
+
+  {# ── Main content ─────────────────────────────────────────── #}
+  <div class="ml-56 min-h-screen min-w-0 overflow-x-hidden">
+    <div id="modo-teste-banner" class="hidden bg-amber-400 text-amber-900 text-xs font-semibold text-center py-2 px-4">
+      ⚠ MODO TESTE ATIVO — todas as notificações estão sendo redirecionadas para o contato de teste
+    </div>
+    <div id="main" class="p-6 max-w-full min-w-0">
+      <div class="flex items-center justify-center py-20">
+        <div class="text-center">
+          <svg class="w-8 h-8 text-indigo-400 animate-spin mx-auto mb-3" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          <p class="text-slate-400 text-sm">Carregando...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Modal (dialog nativo) ────────────────────────────────── #}
+  <dialog id="modal"
+          class="rounded-xl shadow-2xl p-0 w-full max-w-lg border-0 m-auto"
+          style="max-width:min(512px,calc(100vw - 2rem))"
+          onclick="if(event.target===this)closeModal()">
+    <div id="modal-body" class="max-h-[85vh] overflow-y-auto overflow-x-hidden"></div>
+  </dialog>
+
+  {# ── Drawer lateral direito ───────────────────────────────── #}
+  <div id="drawer"
+       class="fixed inset-y-0 right-0 w-[480px] bg-white border-l shadow-2xl z-50 transform translate-x-full transition-transform duration-200 flex flex-col">
+    <div class="flex items-center justify-between px-5 py-4 border-b">
+      <span id="drawer-title" class="font-semibold text-slate-700 text-sm"></span>
+      <button onclick="closeDrawer()"
+              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div id="drawer-body" class="flex-1 overflow-y-auto p-5"></div>
+  </div>
+  <div id="drawer-backdrop"
+       class="fixed inset-0 bg-black/30 z-40 hidden"
+       onclick="closeDrawer()"></div>
+
+  <script>
+    // Active nav
+    function setActive(el) {
+      document.querySelectorAll('.nav-link').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      const first = document.querySelector('.nav-link');
+      if (first) first.classList.add('active');
+    });
+
+    // Modal
+    function openModal()  { document.getElementById('modal').showModal(); }
+    function closeModal() { document.getElementById('modal').close(); }
+
+    // Drawer
+    function openDrawer(title) {
+      if (title) document.getElementById('drawer-title').textContent = title;
+      document.getElementById('drawer').classList.remove('translate-x-full');
+      document.getElementById('drawer-backdrop').classList.remove('hidden');
+    }
+    function closeDrawer() {
+      document.getElementById('drawer').classList.add('translate-x-full');
+      document.getElementById('drawer-backdrop').classList.add('hidden');
+    }
+
+    // Colapsar/expandir grupos (alertas, permissoes, relatorios, agendamentos)
+    function toggleGrupo(grupoId, btn) {
+      const body = document.getElementById(grupoId);
+      const chevron = btn.querySelector('.grupo-chevron');
+      const collapsed = body.classList.toggle('hidden');
+      if (chevron) chevron.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+    }
+
+    // Banner modo teste
+    function atualizarBannerTeste(ativo) {
+      document.getElementById('modo-teste-banner').classList.toggle('hidden', !ativo);
+    }
+    // Checar estado inicial via API
+    fetch('/admin/testes/status').then(r => r.json()).then(d => atualizarBannerTeste(d.ativo)).catch(() => {});
+
+    // HTMX hooks
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+      const id = e.detail.target.id;
+      if (id === 'modal-body')  openModal();
+      if (id === 'drawer-body') openDrawer();
+      if (id === 'main') {
+        closeModal(); closeDrawer();
+        // Atualiza banner modo teste após qualquer navegação
+        fetch('/admin/testes/status').then(r => r.json()).then(d => atualizarBannerTeste(d.ativo)).catch(() => {});
+      }
+    });
+
+    // HTMX hx-trigger="load" on main
+    htmx.process(document.getElementById('main'));
+  </script>
+
+  {# Trigger dashboard load #}
+  <div hx-get="/admin/dashboard" hx-trigger="load" hx-target="#main" hx-swap="innerHTML" style="display:none"></div>
+
+</body>
+</html>

@@ -1,0 +1,79 @@
+{% from "admin/_macros.html" import badge, btn_acao %}
+{# Drawer content: condições de um alerta #}
+
+{% if not conds %}
+<div class="text-center py-10">
+  <svg class="w-8 h-8 text-slate-200 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+  </svg>
+  <p class="text-slate-400 text-sm">Nenhuma condição cadastrada</p>
+</div>
+{% else %}
+<div class="space-y-4" id="cond-list-{{ alerta_id }}">
+  {% for cd in conds %}
+  <div class="border border-slate-200 rounded-xl overflow-hidden {{ 'opacity-60' if not cd.ativo else '' }}">
+    {# Header da condição #}
+    <div class="px-4 py-3 bg-slate-50 flex items-center justify-between">
+      <div>
+        <span class="font-medium text-slate-700 text-sm">{{ cd.nome }}</span>
+        {% if not cd.ativo %}{{ badge("inativo", "gray") }}{% else %}{{ badge("ativo", "green") }}{% endif %}
+      </div>
+      {% if cd.ativo %}
+      {{ btn_acao("Desativar",
+          'hx-post="/admin/condicoes/' ~ cd.id ~ '/toggle" hx-target="#cond-list-' ~ alerta_id ~ '" hx-swap="outerHTML"',
+          "danger") }}
+      {% else %}
+      {{ btn_acao("Ativar",
+          'hx-post="/admin/condicoes/' ~ cd.id ~ '/toggle" hx-target="#cond-list-' ~ alerta_id ~ '" hx-swap="outerHTML"',
+          "success") }}
+      {% endif %}
+    </div>
+
+    <div class="px-4 py-3 space-y-3">
+      {# Cooldown #}
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-slate-500 w-24 flex-shrink-0">Cooldown</span>
+        <form hx-post="/admin/condicoes/{{ cd.id }}/cooldown"
+              hx-target="this" hx-swap="outerHTML"
+              class="flex gap-1.5 items-center">
+          <input type="number" name="cooldown" value="{{ cd.cooldown_minutos }}" min="1"
+                 class="w-16 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300">
+          <span class="text-xs text-slate-400">min</span>
+          <button type="submit"
+                  class="px-2 py-1 text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">✓</button>
+        </form>
+      </div>
+
+      {# Canais #}
+      <div class="flex items-start gap-3">
+        <span class="text-xs text-slate-500 w-24 flex-shrink-0 pt-0.5">Canais</span>
+        <div class="flex gap-1 flex-wrap">
+          {% for ch in (cd.canais if cd.canais else []) %}
+          {{ badge(ch, "blue") }}
+          {% else %}
+          <span class="text-xs text-slate-400">—</span>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Último disparo #}
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-slate-500 w-24 flex-shrink-0">Último disparo</span>
+        <span class="text-xs text-slate-600">{{ cd.ultimo_disparo_fmt }}</span>
+      </div>
+
+      {# Destinatários #}
+      <div class="flex items-start gap-3">
+        <span class="text-xs text-slate-500 w-24 flex-shrink-0 pt-1">Destinatários</span>
+        <div id="dest-wrap-{{ cd.id }}" class="flex-1">
+          {% set condicao_id = cd.id %}
+          {% set destinatarios = cd.destinatarios_info %}
+          {% include "admin/dest_div.html" %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

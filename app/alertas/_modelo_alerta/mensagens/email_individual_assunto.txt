@@ -1,0 +1,1 @@
+[{{ severidade | upper }}] {{ titulo }} — Pedido {{ pedido }} / {{ nome_cliente }}

@@ -1,0 +1,127 @@
+{% from "admin/_macros.html" import btn_submit %}
+{# Modal: formulário de novo agendamento #}
+{% set input_cls = "w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" %}
+{% set chk_cls = "h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" %}
+
+<div class="px-6 py-5 border-b">
+  <h3 class="font-semibold text-slate-800">Novo Agendamento</h3>
+</div>
+
+<form hx-post="/admin/agendamentos" hx-target="#main" hx-swap="innerHTML" class="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Usuário<span class="text-red-400 ml-0.5">*</span></label>
+      <input type="text" list="form-usuarios-list" name="usuario_nome_busca" placeholder="Digite o nome..."
+             class="{{ input_cls }}" autocomplete="off"
+             oninput="syncUsuarioId(this)">
+      <input type="hidden" name="usuario_id" id="form-usuario-id">
+      <datalist id="form-usuarios-list">
+        {% for u in usuarios %}
+        <option value="{{ u.nome }}" data-id="{{ u.id }}">{{ u.identificador }}</option>
+        {% endfor %}
+      </datalist>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Tipo<span class="text-red-400 ml-0.5">*</span></label>
+      <select name="tipo_recurso" required class="{{ input_cls }}"
+              hx-get="/admin/recursos" hx-trigger="change" hx-target="#ag-recurso" hx-swap="innerHTML">
+        <option value="relatorio">Relatório</option>
+        <option value="alerta">Alerta</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Recurso<span class="text-red-400 ml-0.5">*</span></label>
+      <select name="recurso_id" required id="ag-recurso" class="{{ input_cls }}">
+        {% for r in rel_opts %}
+        <option value="{{ r.id }}">{{ r.titulo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Frequência<span class="text-red-400 ml-0.5">*</span></label>
+      <select name="frequencia" required class="{{ input_cls }}"
+              onchange="
+                document.getElementById('ag-dia-semana').style.display = this.value === 'semanal' ? '' : 'none';
+                document.getElementById('ag-dia-mes').style.display    = this.value === 'mensal'  ? '' : 'none';
+              ">
+        <option value="diaria">Diária</option>
+        <option value="semanal">Semanal</option>
+        <option value="mensal">Mensal</option>
+      </select>
+    </div>
+
+    <div id="ag-dia-semana" style="display:none">
+      <label class="block text-xs font-medium text-slate-600 mb-1">Dia da semana</label>
+      <select name="dia_semana" class="{{ input_cls }}">
+        <option value="1">Segunda</option><option value="2">Terça</option>
+        <option value="3">Quarta</option><option value="4">Quinta</option>
+        <option value="5">Sexta</option><option value="6">Sábado</option>
+        <option value="7">Domingo</option>
+      </select>
+    </div>
+
+    <div id="ag-dia-mes" style="display:none">
+      <label class="block text-xs font-medium text-slate-600 mb-1">Dia do mês</label>
+      <input type="number" name="dia_mes" min="1" max="31" placeholder="1–31" class="{{ input_cls }}">
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Horários<span class="text-red-400 ml-0.5">*</span></label>
+      <input type="text" name="horarios_str" placeholder="08:00, 18:00" required class="{{ input_cls }}">
+      <p class="text-xs text-slate-400 mt-0.5">Separados por vírgula</p>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Timezone<span class="text-red-400 ml-0.5">*</span></label>
+      <select name="timezone" required class="{{ input_cls }}">
+        <option value="America/Sao_Paulo">São Paulo (UTC-3)</option>
+        <option value="America/Cuiaba">Cuiabá (UTC-4)</option>
+        <option value="America/Manaus">Manaus (UTC-4)</option>
+        <option value="America/Porto_Velho">Porto Velho (UTC-4)</option>
+        <option value="America/Rio_Branco">Rio Branco (UTC-5)</option>
+        <option value="America/Fortaleza">Fortaleza (UTC-3)</option>
+        <option value="UTC">UTC</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="flex gap-6">
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-2">Canais<span class="text-red-400 ml-0.5">*</span></label>
+      <div class="flex gap-4">
+        <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+          <input type="checkbox" name="canais" value="whatsapp" class="{{ chk_cls }}"> WhatsApp
+        </label>
+        <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+          <input type="checkbox" name="canais" value="email" class="{{ chk_cls }}"> Email
+        </label>
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-2">Opções</label>
+      <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+        <input type="checkbox" name="apenas_dias_uteis" value="true" class="{{ chk_cls }}"> Apenas dias úteis
+      </label>
+    </div>
+  </div>
+
+  <div class="flex justify-end gap-3 pt-2 border-t">
+    <button type="button" onclick="closeModal()"
+            class="px-4 py-2 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+      Cancelar
+    </button>
+    {{ btn_submit("Criar Agendamento") }}
+  </div>
+</form>
+
+<script>
+function syncUsuarioId(input) {
+  const list = document.getElementById('form-usuarios-list');
+  const opt = Array.from(list.options).find(o => o.value === input.value);
+  document.getElementById('form-usuario-id').value = opt ? opt.dataset.id : '';
+}
+</script>

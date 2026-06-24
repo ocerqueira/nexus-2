@@ -1,0 +1,162 @@
+{% from "admin/_macros.html" import badge, badge_ativo, btn_acao, paginacao %}
+
+{% if msg %}
+{% set tipo_cls = "bg-green-50 border-green-200 text-green-700" if msg_tipo == "ok" else "bg-red-50 border-red-200 text-red-700" %}
+<div class="mb-4 px-4 py-3 rounded-lg border text-sm {{ tipo_cls }}">{{ msg }}</div>
+{% endif %}
+
+{# ── Toolbar ──────────────────────────────────────────── #}
+<div class="flex flex-wrap items-center gap-2 mb-5">
+  <div class="relative w-64">
+    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    </svg>
+    <input type="text" name="busca" value="{{ busca }}"
+           placeholder="Usuário ou recurso..."
+           class="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+           hx-get="/admin/agendamentos" hx-trigger="keyup changed delay:400ms"
+           hx-target="#main" hx-swap="innerHTML"
+           hx-include="[name='tipo_filtro'],[name='freq_filtro'],[name='status_filtro']">
+  </div>
+
+  {# Tipo #}
+  <div class="flex gap-1">
+    {% for val, label in [("", "Tudo"), ("relatorio", "Relatório"), ("alerta", "Alerta")] %}
+    <button type="button"
+            class="px-2.5 py-1.5 text-xs rounded-full border transition-colors
+                   {{ 'bg-violet-600 text-white border-violet-600' if tipo_filtro == val else 'bg-white text-slate-600 border-slate-200 hover:border-slate-400' }}"
+            hx-get="/admin/agendamentos?tipo_filtro={{ val }}&freq_filtro={{ freq_filtro }}&status_filtro={{ status_filtro }}&busca={{ busca }}"
+            hx-target="#main" hx-swap="innerHTML">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  {# Frequência #}
+  <div class="flex gap-1">
+    {% for val, label in [("", "Qualquer"), ("diaria", "Diária"), ("semanal", "Semanal"), ("mensal", "Mensal")] %}
+    <button type="button"
+            class="px-2.5 py-1.5 text-xs rounded-full border transition-colors
+                   {{ 'bg-slate-700 text-white border-slate-700' if freq_filtro == val else 'bg-white text-slate-600 border-slate-200 hover:border-slate-400' }}"
+            hx-get="/admin/agendamentos?freq_filtro={{ val }}&tipo_filtro={{ tipo_filtro }}&status_filtro={{ status_filtro }}&busca={{ busca }}"
+            hx-target="#main" hx-swap="innerHTML">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  {# Status #}
+  <div class="flex gap-1">
+    {% for val, label in [("", "Todos"), ("ativo", "Ativo"), ("inativo", "Inativo")] %}
+    <button type="button"
+            class="px-2.5 py-1.5 text-xs rounded-full border transition-colors
+                   {{ 'bg-green-600 text-white border-green-600' if status_filtro == val else 'bg-white text-slate-600 border-slate-200 hover:border-slate-400' }}"
+            hx-get="/admin/agendamentos?status_filtro={{ val }}&tipo_filtro={{ tipo_filtro }}&freq_filtro={{ freq_filtro }}&busca={{ busca }}"
+            hx-target="#main" hx-swap="innerHTML">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  <button class="ml-auto inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+          hx-get="/admin/agendamentos/form" hx-target="#modal-body" hx-swap="innerHTML">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Novo agendamento
+  </button>
+</div>
+
+{# ── Grupos por usuário ────────────────────────────────── #}
+{% if not grupos %}
+<div class="bg-white rounded-xl border shadow-sm p-12 text-center">
+  <svg class="w-10 h-10 text-slate-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+  </svg>
+  <p class="text-slate-400 text-sm">Nenhum agendamento encontrado</p>
+  <p class="text-slate-300 text-xs mt-1">Use os filtros acima ou crie um novo agendamento</p>
+</div>
+{% else %}
+<div class="space-y-3">
+  {% for grupo in grupos %}
+  <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+
+    {# Cabeçalho do grupo (usuário) — clicável para colapsar #}
+    {% set grupo_id = "ag-grupo-" ~ loop.index %}
+    <div class="px-5 py-3 bg-slate-50/70 border-b flex items-center gap-3">
+      <button class="flex items-center gap-2 flex-1 min-w-0 text-left"
+              onclick="toggleGrupo('{{ grupo_id }}', this)">
+        <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center
+                    text-indigo-700 font-bold text-sm flex-shrink-0">
+          {{ grupo.usuario_nome[0] | upper if grupo.usuario_nome else "?" }}
+        </div>
+        <span class="font-semibold text-slate-800 text-sm">{{ grupo.usuario_nome or "Sem usuário" }}</span>
+        <span class="text-xs text-slate-400">{{ grupo.agendamentos | length }} agendamento(s)</span>
+        <svg class="grupo-chevron w-4 h-4 text-slate-400 ml-1 transition-transform duration-150 rotate-0"
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      <button class="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-indigo-600
+                     hover:bg-indigo-50 border border-indigo-200 rounded-lg transition-colors flex-shrink-0"
+              hx-get="/admin/agendamentos/form?usuario_id={{ grupo.usuario_id }}"
+              hx-target="#modal-body" hx-swap="innerHTML"
+              title="Adicionar agendamento para {{ grupo.usuario_nome }}">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Adicionar
+      </button>
+    </div>
+
+    {# Linhas de agendamentos — colapsável #}
+    <div id="{{ grupo_id }}" class="divide-y divide-slate-100">
+      {% for ag in grupo.agendamentos %}
+      {% set tipo_cor = "violet" if ag.tipo_recurso == "relatorio" else "orange" %}
+      {% set zebra = "bg-white" if loop.index is odd else "bg-slate-50" %}
+      <div class="px-5 py-3 flex items-start gap-4 {{ zebra }} {{ 'opacity-50' if not ag.ativo else '' }}">
+
+        {# Tipo + Recurso #}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            {{ badge(ag.tipo_recurso, tipo_cor) }}
+            <span class="font-medium text-slate-800 text-sm truncate">{{ ag.recurso_nome or "—" }}</span>
+            {% if not ag.ativo %}
+            <span class="text-xs text-slate-400 italic">inativo</span>
+            {% endif %}
+          </div>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-slate-400">
+            <span>{{ badge(ag.frequencia, "gray") }}</span>
+            <span>🕐 {{ ag.horarios_str }}</span>
+            {% if ag.apenas_dias_uteis %}<span>· dias úteis</span>{% endif %}
+            {% if ag.proximo_envio_fmt != "—" %}
+            <span>· próximo <strong class="text-slate-600">{{ ag.proximo_envio_fmt }}</strong></span>
+            {% endif %}
+            {% for canal in (ag.canais if ag.canais else []) %}
+            {{ badge(canal, "blue") }}
+            {% endfor %}
+          </div>
+        </div>
+
+        {# Ações #}
+        <div class="flex-shrink-0 pt-0.5 flex items-center gap-2">
+          {% if ag.ativo %}
+          {{ btn_acao("▶ Executar agora",
+              'hx-post="/admin/agendamentos/' ~ ag.id ~ '/executar-agora" hx-swap="outerHTML"',
+              "ghost") }}
+          {{ btn_acao("Desativar",
+              'hx-delete="/admin/agendamentos/' ~ ag.id ~ '" hx-target="#main" hx-swap="innerHTML" hx-confirm="Desativar este agendamento?"',
+              "danger") }}
+          {% else %}
+          {{ btn_acao("Reativar",
+              'hx-post="/admin/agendamentos/' ~ ag.id ~ '/reativar" hx-target="#main" hx-swap="innerHTML"',
+              "success") }}
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Paginação por usuário ─────────────────────────────── #}
+{% set url_base = "/admin/agendamentos?busca=" ~ busca ~ "&tipo_filtro=" ~ tipo_filtro ~ "&freq_filtro=" ~ freq_filtro ~ "&status_filtro=" ~ status_filtro %}
+{{ paginacao(pagina, total_paginas, total, "usuário(s) com agendamentos", url_base) }}

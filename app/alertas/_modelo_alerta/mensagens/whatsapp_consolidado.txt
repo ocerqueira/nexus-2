@@ -1,0 +1,34 @@
+⚠️ *{{ titulo }}*
+🚨 Severidade: {{ severidade | upper }}
+
+{% if total == 1 %}
+*1 ocorrência* detectada:
+{% else %}
+*{{ total }} ocorrências* detectadas em {{ estatisticas.pedidos_unicos }} pedido(s):
+{% endif %}
+
+{% for item in dados %}
+┌─ *Pedido {{ item.pedido }}* — {{ item.nome_cliente }}
+│   Produto: {{ item.produto }} ({{ item.cod_produto }})
+│   Qtd: {{ item.quantidade }} │ Valor: *R$ {{ "{:,.2f}".format(item.valor) }}*
+{% if item.excedente is defined and item.excedente > 0 %}│   Excedente: *+R$ {{ "{:,.2f}".format(item.excedente) }} ({{ item.pct_excedente }}%)*
+{% endif %}│   Vendedor: {{ item.nome_vendedor }}
+│   📞 {{ item.telefone_vendedor or 'N/D' }}
+└─ {{ item.data }}
+
+{% endfor %}
+
+📊 *Resumo:*
+• Categorias afetadas: {{ estatisticas.categorias_unicas }}
+• Vendedores afetados: {{ estatisticas.vendedores_unicos }}
+• Valor total: R$ {{ "{:,.2f}".format(estatisticas.valor_total) }}
+• Maior valor: R$ {{ "{:,.2f}".format(estatisticas.valor_max) }}
+
+{% if contatos_notificacao %}
+👥 *Setores notificados:*
+{% for c in contatos_notificacao %}
+  {{ c.setor }} — {{ c.nome }} 📞 {{ c.whatsapp or 'N/D' }}
+{% endfor %}
+{% endif %}
+
+_Gerado pelo Nexus em {{ data_geracao }}_

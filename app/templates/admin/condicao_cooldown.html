@@ -1,0 +1,10 @@
+{# Partial: form de cooldown para uma condição. Vars: condicao_id, cooldown (int) #}
+<form hx-post="/admin/condicoes/{{ condicao_id }}/cooldown"
+      hx-target="this" hx-swap="outerHTML"
+      class="flex gap-1 items-center">
+  <input type="number" name="cooldown" value="{{ cooldown }}" min="1"
+         class="w-16 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300">
+  <span class="text-xs text-slate-400">min</span>
+  <button type="submit"
+          class="px-2 py-0.5 text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">✓</button>
+</form>

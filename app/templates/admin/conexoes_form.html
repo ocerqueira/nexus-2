@@ -1,0 +1,30 @@
+{% from "admin/_macros.html" import campo, btn_submit %}
+{# Modal: formulário de nova conexão #}
+
+<div class="px-6 py-5 border-b">
+  <h3 class="font-semibold text-slate-800">Nova Conexão</h3>
+  <p class="text-xs text-slate-500 mt-0.5">Cadastre uma conexão com banco de dados externo</p>
+</div>
+
+<form hx-post="/admin/conexoes" hx-target="#main" hx-swap="innerHTML" class="px-6 py-5 space-y-4">
+  <div class="grid grid-cols-2 gap-4">
+    {{ campo("nome", "Nome identificador", placeholder="erp_principal") }}
+    {{ campo("tipo", "Tipo", opcoes=["firebird", "postgres", "mysql"]) }}
+    {{ campo("host", "Host / IP", placeholder="192.168.1.10") }}
+    {{ campo("porta", "Porta", tipo="number", placeholder="3050") }}
+  </div>
+  {{ campo("banco", "Banco / Caminho .fdb", placeholder="/dados/empresa.fdb") }}
+  <div class="grid grid-cols-2 gap-4">
+    {{ campo("usuario", "Usuário", placeholder="SYSDBA") }}
+    {{ campo("senha", "Senha", tipo="password") }}
+  </div>
+  {{ campo("observacoes", "Observações", obrigatorio=False, placeholder="Opcional") }}
+
+  <div class="flex justify-end gap-3 pt-2 border-t mt-4">
+    <button type="button" onclick="closeModal()"
+            class="px-4 py-2 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+      Cancelar
+    </button>
+    {{ btn_submit("Criar Conexão") }}
+  </div>
+</form>

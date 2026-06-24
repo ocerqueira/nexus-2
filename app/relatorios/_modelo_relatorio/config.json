@@ -1,0 +1,28 @@
+{
+  "titulo": "Nome do Relatório",
+  "descricao": "Descreva aqui o que este relatório mostra, quais fontes usa e para quem se destina. Ex: dashboard de desempenho por categoria com metas, gráficos e ranking.",
+  "categoria": "operacional",
+  "parametros": [
+    {
+      "nome": "cod_empresa",
+      "tipo": "integer",
+      "obrigatorio": false,
+      "padrao": 1,
+      "rotulo": "Código da empresa"
+    },
+    {
+      "nome": "ano",
+      "tipo": "integer",
+      "obrigatorio": false,
+      "padrao": 2026,
+      "rotulo": "Ano de referência"
+    },
+    {
+      "nome": "mes",
+      "tipo": "integer",
+      "obrigatorio": false,
+      "padrao": 6,
+      "rotulo": "Mês de referência (1-12)"
+    }
+  ]
+}

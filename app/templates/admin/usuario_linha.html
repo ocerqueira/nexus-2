@@ -1,0 +1,24 @@
+{% from "admin/_macros.html" import badge, badge_ativo, btn_acao %}
+{# Partial: <tr> display mode. Var: u (dict) #}
+<tr id="row-u{{ u.id }}" class="hover:bg-slate-50/50 transition-colors">
+  <td class="px-5 py-3.5 font-medium text-slate-800">{{ u.nome }}</td>
+  <td class="px-5 py-3.5 text-xs text-slate-500 font-mono">{{ u.identificador }}</td>
+  <td class="px-5 py-3.5">{{ badge(u.origem, "blue") }}</td>
+  <td class="px-5 py-3.5 text-sm text-slate-600">{{ u.whatsapp_numero or "—" }}</td>
+  <td class="px-5 py-3.5 text-sm text-slate-600">{{ u.email or "—" }}</td>
+  <td class="px-5 py-3.5 text-sm text-slate-500">{{ u.departamento or "—" }}</td>
+  <td class="px-5 py-3.5">{{ badge_ativo(u.ativo) }}</td>
+  <td class="px-5 py-3.5 text-right whitespace-nowrap">
+    {% if u.ativo %}
+    {{ btn_acao("Editar",
+        'hx-get="/admin/usuarios/' ~ u.id ~ '/editar" hx-target="#row-u' ~ u.id ~ '" hx-swap="outerHTML"') }}
+    {{ btn_acao("Desativar",
+        'hx-delete="/admin/usuarios/' ~ u.id ~ '" hx-target="#main" hx-swap="innerHTML" hx-confirm="Desativar ' ~ u.nome ~ '?"',
+        "danger") }}
+    {% else %}
+    {{ btn_acao("Reativar",
+        'hx-post="/admin/usuarios/' ~ u.id ~ '/reativar" hx-target="#main" hx-swap="innerHTML"',
+        "success") }}
+    {% endif %}
+  </td>
+</tr>

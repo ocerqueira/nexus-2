@@ -1,0 +1,350 @@
+{
+  "name": "Nexus — Chatbot WhatsApp (Menu)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nexus-chatbot",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook — Evolution messages.upsert",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "nexus-chatbot"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\nconst data = body.data || body;\nconst key = data.key || {};\nconst msg = data.message || {};\nconst fromMe = key.fromMe === true;\nconst numero = (key.remoteJid||'').replace(/@[sg]\\.whatsapp\\.net|@g\\.us/g,'');\nconst listResp = msg.listResponseMessage;\nconst list_id = listResp?.singleSelectReply?.selectedRowId || null;\nconst texto = list_id ? '' : (msg.conversation || msg.extendedTextMessage?.text || '').trim();\nconst msg_type = list_id ? 'list' : 'text';\nif (fromMe || (!texto && !list_id)) return [{skip:true,numero}];\nreturn [{skip:false,numero,msg_type,list_id,texto}];"
+      },
+      "id": "parse-msg",
+      "name": "Code — parse mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            { "leftValue": "={{ $json.skip }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }
+          ]
+        }
+      },
+      "id": "if-skip",
+      "name": "IF — skip?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": { "jsCode": "return [];" },
+      "id": "noop",
+      "name": "Ignorar (fromMe / sem texto)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 160]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.NEXUS_URL }}/chatbot/sessao/{{ $json.numero }}",
+        "options": { "ignore400": true }
+      },
+      "id": "get-sessao",
+      "name": "GET — sessao",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sessao = $('GET — sessao').item.json;\nconst parsed = $('Code — parse mensagem').item.json;\nconst { numero, msg_type, list_id, texto } = parsed;\nconst etapa = sessao.etapa || 'idle';\nconst recurso_tipo = sessao.recurso_tipo || null;\nconst recurso_nome = sessao.recurso_nome || null;\nconst ps = sessao.parametros || {};\n\nconst toISO = d => d.toISOString().split('T')[0];\nconst hoje = new Date();\nconst ano = hoje.getFullYear();\nconst mes = hoje.getMonth();\n\nfunction calcPeriodo(id) {\n  switch(id) {\n    case 'p_este_mes': return {data_inicio:toISO(new Date(ano,mes,1)),data_fim:toISO(new Date(ano,mes+1,0))};\n    case 'p_mes_passado': return {data_inicio:toISO(new Date(ano,mes-1,1)),data_fim:toISO(new Date(ano,mes,0))};\n    case 'p_30dias': return {data_inicio:toISO(new Date(hoje-30*864e5)),data_fim:toISO(hoje)};\n    case 'p_90dias': return {data_inicio:toISO(new Date(hoje-90*864e5)),data_fim:toISO(hoje)};\n    default: return null;\n  }\n}\n\nfunction parseData(s) {\n  let m = s.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);\n  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;\n  m = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);\n  return m ? s : null;\n}\n\nlet action = 'send_menu';\nlet txt = '';\nlet call_nome = null;\nlet call_params = {};\nlet ns = {etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n\nconst quer_menu = (etapa==='idle'||texto.toLowerCase()==='menu'||texto==='0') && msg_type==='text';\n\nif (quer_menu || etapa==='idle') {\n  action='send_menu';\n  ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n}\nelse if (etapa==='aguardando_menu' && msg_type==='list') {\n  if (list_id==='ajuda') {\n    action='send_texto';\n    txt='*Nexus — Como usar*\\n\\n📊 *Relatórios disponíveis:*\\n• Pedidos por Vendedor — ranking de vendedores com ticket médio e top 5 produtos\\n\\n🚨 *Alertas disponíveis:*\\n• Comprimento Excedente — itens de telha/SBX acima do limite\\n\\nDigite *menu* a qualquer momento para voltar ao início.';\n    ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n  } else if (list_id?.startsWith('rel_')) {\n    action='send_periodo';\n    ns={etapa:'aguardando_periodo',recurso_tipo:'relatorio',recurso_nome:list_id.slice(4),parametros:{cod_empresa:1}};\n  } else if (list_id?.startsWith('alerta_')) {\n    action='call_alerta';\n    call_nome=list_id.slice(7);\n    call_params={cod_empresa:1};\n    ns={etapa:'idle',recurso_tipo:null,recurso_nome:null,parametros:{}};\n  } else {\n    action='send_menu';\n    ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n  }\n}\nelse if (etapa==='aguardando_periodo' && msg_type==='list') {\n  if (list_id==='p_custom') {\n    action='send_texto';\n    txt='📅 *Data de início:*\\nDigite no formato DD/MM/YYYY\\nEx: 01/01/2026';\n    ns={etapa:'aguardando_data_inicio',recurso_tipo,recurso_nome,parametros:ps};\n  } else {\n    const p = calcPeriodo(list_id);\n    if (p) {\n      action='call_relatorio';\n      call_nome=recurso_nome;\n      call_params={...ps,...p};\n      ns={etapa:'idle',recurso_tipo:null,recurso_nome:null,parametros:{}};\n    } else {\n      action='send_periodo';\n      ns=sessao;\n    }\n  }\n}\nelse if (etapa==='aguardando_data_inicio' && msg_type==='text') {\n  const d = parseData(texto.trim());\n  if (!d) {\n    action='send_texto';\n    txt='❌ Formato inválido. Use DD/MM/YYYY\\nEx: 01/01/2026';\n    ns=sessao;\n  } else {\n    action='send_texto';\n    txt='📅 *Data de fim:*\\nDigite no formato DD/MM/YYYY\\nEx: 28/02/2026';\n    ns={etapa:'aguardando_data_fim',recurso_tipo,recurso_nome,parametros:{...ps,data_inicio:d}};\n  }\n}\nelse if (etapa==='aguardando_data_fim' && msg_type==='text') {\n  const d = parseData(texto.trim());\n  if (!d) {\n    action='send_texto';\n    txt='❌ Formato inválido. Use DD/MM/YYYY\\nEx: 28/02/2026';\n    ns=sessao;\n  } else {\n    action='call_relatorio';\n    call_nome=recurso_nome;\n    call_params={...ps,data_fim:d};\n    ns={etapa:'idle',recurso_tipo:null,recurso_nome:null,parametros:{}};\n  }\n}\nelse {\n  action='send_menu';\n  ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n}\n\nreturn [{\n  numero,\n  next_action: action,\n  mensagem_texto: txt,\n  recurso_nome: call_nome,\n  recurso_nome_sessao: recurso_nome,\n  parametros: call_params,\n  novo_estado: ns\n}];"
+      },
+      "id": "compute",
+      "name": "Code — state machine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 380]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.NEXUS_URL }}/chatbot/sessao/{{ $json.numero }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.novo_estado) }}",
+        "options": {}
+      },
+      "id": "put-sessao",
+      "name": "PUT — sessao",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1360, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [$('Code — state machine').item.json];"
+      },
+      "id": "pass-to-switch",
+      "name": "Code — pass to switch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 380]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.next_action }}", "rightValue": "send_menu", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "menu" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.next_action }}", "rightValue": "send_periodo", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "periodo" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.next_action }}", "rightValue": "send_texto", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "texto" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.next_action }}", "rightValue": "call_relatorio", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "relatorio" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.next_action }}", "rightValue": "call_alerta", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "alerta" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch",
+      "name": "Switch — next_action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1800, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $json;\nreturn [{\n  number: item.numero,\n  title: 'Nexus — Sistema ERP',\n  description: 'Selecione um relatório ou alerta',\n  buttonText: 'Ver opções',\n  footerText: 'Nexus',\n  sections: [\n    { title: '📊 Relatórios', rows: [\n      { rowId: 'rel_pedidos_por_vendedor', title: 'Pedidos por Vendedor', description: 'Ranking com ticket médio e top 5 produtos' }\n    ]},\n    { title: '🚨 Alertas', rows: [\n      { rowId: 'alerta_item_comprimento_excedente', title: 'Comprimento Excedente', description: 'Itens de telha/SBX acima do limite' }\n    ]},\n    { title: '❓ Suporte', rows: [\n      { rowId: 'ajuda', title: 'Ajuda', description: 'Como usar o Nexus' }\n    ]}\n  ]\n}];"
+      },
+      "id": "build-menu",
+      "name": "Code — build menu principal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2020, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_URL }}/message/sendList/{{ $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "ignore400": true }
+      },
+      "id": "enviar-menu",
+      "name": "Evolution — sendList menu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2240, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $json;\nconst nome_fmt = (item.recurso_nome_sessao||'relatório').replace(/_/g,' ');\nconst hoje = new Date();\nconst mes_nome = hoje.toLocaleString('pt-BR',{month:'long'});\nconst ano = hoje.getFullYear();\nconst mes = hoje.getMonth();\nconst toISO = d => d.toISOString().split('T')[0];\nconst ult_mes = new Date(ano,mes-1,1);\nconst ult_mes_nome = ult_mes.toLocaleString('pt-BR',{month:'long'});\nreturn [{\n  number: item.numero,\n  title: `Período — ${nome_fmt}`,\n  description: 'Selecione o período de consulta',\n  buttonText: 'Selecionar',\n  footerText: 'Nexus',\n  sections: [\n    { title: '⚡ Períodos rápidos', rows: [\n      { rowId: 'p_este_mes', title: 'Este mês', description: `${mes_nome}/${ano}` },\n      { rowId: 'p_mes_passado', title: 'Mês passado', description: `${ult_mes_nome}/${ano}` },\n      { rowId: 'p_30dias', title: 'Últimos 30 dias', description: 'Período corrido' },\n      { rowId: 'p_90dias', title: 'Último trimestre', description: 'Últimos 90 dias' }\n    ]},\n    { title: '🗓️ Personalizado', rows: [\n      { rowId: 'p_custom', title: 'Período personalizado', description: 'Digitar datas (DD/MM/YYYY)' }\n    ]}\n  ]\n}];"
+      },
+      "id": "build-periodo",
+      "name": "Code — build menu período",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2020, 360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_URL }}/message/sendList/{{ $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "ignore400": true }
+      },
+      "id": "enviar-periodo",
+      "name": "Evolution — sendList período",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2240, 360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.numero }}\",\n  \"text\": {{ JSON.stringify($json.mensagem_texto) }}\n}",
+        "options": { "ignore400": true }
+      },
+      "id": "enviar-texto",
+      "name": "Evolution — sendText",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2020, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXUS_URL }}/relatorios/{{ $json.recurso_nome }}/solicitar",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "formato", "value": "pdf" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"parametros\": {{ JSON.stringify($json.parametros) }} }",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      },
+      "id": "call-relatorio",
+      "name": "POST — solicitar relatório PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2020, 640]
+    },
+    {
+      "parameters": {
+        "jsCode": "const src = $('Code — state machine').item.json;\nconst binData = $input.first().binary?.data;\nif (!binData) {\n  return [{ _tipo:'texto', numero: src.numero, mensagem: '❌ Erro ao gerar o relatório. Tente novamente ou digite *menu*.' }];\n}\nconst b64 = 'data:application/pdf;base64,' + Buffer.from(binData).toString('base64');\nconst p = src.parametros || {};\nconst periodo = (p.data_inicio && p.data_fim) ? `${p.data_inicio} a ${p.data_fim}` : 'período selecionado';\nconst nome_fmt = (src.recurso_nome||'relatório').replace(/_/g,' ');\nreturn [{ _tipo:'pdf', numero: src.numero, base64: b64, caption: `📊 *${nome_fmt}* — ${periodo}` }];"
+      },
+      "id": "preparar-pdf",
+      "name": "Code — preparar PDF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 640]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_URL }}/message/sendMedia/{{ $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.numero }}\",\n  \"mediatype\": \"document\",\n  \"media\": \"{{ $json.base64 }}\",\n  \"fileName\": \"relatorio.pdf\",\n  \"caption\": {{ JSON.stringify($json.caption) }}\n}",
+        "options": { "ignore400": true }
+      },
+      "id": "enviar-pdf",
+      "name": "Evolution — sendMedia PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2460, 640]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXUS_URL }}/alertas/{{ $json.recurso_nome }}/verificar",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"parametros\": {{ JSON.stringify($json.parametros) }} }",
+        "options": {}
+      },
+      "id": "call-alerta",
+      "name": "POST — verificar alerta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2020, 780]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json;\nconst numero = $('Code — state machine').item.json.numero;\nif (payload.deve_notificar) {\n  const al = payload.alerta || {};\n  const consolidado = payload.mensagens_consolidadas?.whatsapp || '';\n  const msg = `🚨 *${al.titulo||'Alerta'}*\\n\\n${payload.resumo||''}` + (consolidado ? `\\n\\n${consolidado}` : '');\n  return [{numero, mensagem: msg}];\n} else {\n  const motivos = {\n    sem_dados: '✅ Nenhum item encontrado no período.',\n    em_cooldown: `⏳ Alerta em cooldown — ${payload.tempo_restante_min||0} min restantes.`,\n    dados_sem_alteracao: '✅ Sem novidades desde o último disparo.'\n  };\n  return [{numero, mensagem: motivos[payload.motivo] || `Alerta: ${payload.motivo||'sem resultado'}`}];\n}"
+      },
+      "id": "preparar-alerta-resp",
+      "name": "Code — preparar resposta alerta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 780]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.numero }}\",\n  \"text\": {{ JSON.stringify($json.mensagem) }}\n}",
+        "options": { "ignore400": true }
+      },
+      "id": "enviar-alerta-resp",
+      "name": "Evolution — sendText alerta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2460, 780]
+    }
+  ],
+  "connections": {
+    "Webhook — Evolution messages.upsert": {
+      "main": [[{ "node": "Code — parse mensagem", "type": "main", "index": 0 }]]
+    },
+    "Code — parse mensagem": {
+      "main": [[{ "node": "IF — skip?", "type": "main", "index": 0 }]]
+    },
+    "IF — skip?": {
+      "main": [
+        [{ "node": "Ignorar (fromMe / sem texto)", "type": "main", "index": 0 }],
+        [{ "node": "GET — sessao", "type": "main", "index": 0 }]
+      ]
+    },
+    "GET — sessao": {
+      "main": [[{ "node": "Code — state machine", "type": "main", "index": 0 }]]
+    },
+    "Code — state machine": {
+      "main": [[{ "node": "PUT — sessao", "type": "main", "index": 0 }]]
+    },
+    "PUT — sessao": {
+      "main": [[{ "node": "Code — pass to switch", "type": "main", "index": 0 }]]
+    },
+    "Code — pass to switch": {
+      "main": [[{ "node": "Switch — next_action", "type": "main", "index": 0 }]]
+    },
+    "Switch — next_action": {
+      "main": [
+        [{ "node": "Code — build menu principal", "type": "main", "index": 0 }],
+        [{ "node": "Code — build menu período", "type": "main", "index": 0 }],
+        [{ "node": "Evolution — sendText", "type": "main", "index": 0 }],
+        [{ "node": "POST — solicitar relatório PDF", "type": "main", "index": 0 }],
+        [{ "node": "POST — verificar alerta", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code — build menu principal": {
+      "main": [[{ "node": "Evolution — sendList menu", "type": "main", "index": 0 }]]
+    },
+    "Code — build menu período": {
+      "main": [[{ "node": "Evolution — sendList período", "type": "main", "index": 0 }]]
+    },
+    "POST — solicitar relatório PDF": {
+      "main": [[{ "node": "Code — preparar PDF", "type": "main", "index": 0 }]]
+    },
+    "Code — preparar PDF": {
+      "main": [[{ "node": "Evolution — sendMedia PDF", "type": "main", "index": 0 }]]
+    },
+    "POST — verificar alerta": {
+      "main": [[{ "node": "Code — preparar resposta alerta", "type": "main", "index": 0 }]]
+    },
+    "Code — preparar resposta alerta": {
+      "main": [[{ "node": "Evolution — sendText alerta", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "nexus" }, { "name": "chatbot" }],
+  "meta": {
+    "description": "Chatbot WhatsApp com navegação por menus (Evolution sendList). Estado persistido no banco Nexus (chatbot_sessoes). Fluxo: menu principal → seleção de período → gera relatório PDF ou verifica alerta.",
+    "templateCredsSetupCompleted": false
+  }
+}

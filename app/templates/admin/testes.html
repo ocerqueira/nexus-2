@@ -1,0 +1,94 @@
+{% from "admin/_macros.html" import badge %}
+
+{% if msg %}
+{% set tipo_cls = "bg-green-50 border-green-200 text-green-700" if msg_tipo == "ok" else "bg-amber-50 border-amber-300 text-amber-800" %}
+<div class="mb-4 px-4 py-3 rounded-lg border text-sm font-medium {{ tipo_cls }}">{{ msg }}</div>
+{% endif %}
+
+{# ── Status atual ─────────────────────────────────────────── #}
+<div class="bg-white rounded-xl border shadow-sm mb-5 overflow-hidden">
+  <div class="px-5 py-4 border-b bg-slate-50 flex items-center justify-between">
+    <div>
+      <h3 class="font-semibold text-slate-700 text-sm">Modo Teste</h3>
+      <p class="text-xs text-slate-400 mt-0.5">
+        Quando ativo, <strong>todas</strong> as notificações do sistema (alertas, agendamentos)
+        são redirecionadas para o contato de teste em vez dos destinatários reais.
+      </p>
+    </div>
+    {% if modo_teste %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-800 text-xs font-bold rounded-full border border-amber-300">
+      <span class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+      ATIVO
+    </span>
+    {% else %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-500 text-xs font-medium rounded-full border border-slate-200">
+      <span class="w-2 h-2 bg-slate-300 rounded-full"></span>
+      Inativo
+    </span>
+    {% endif %}
+  </div>
+
+  <form class="px-5 py-5 space-y-4"
+        hx-post="/admin/testes/config" hx-target="#main" hx-swap="innerHTML">
+
+    <div class="flex flex-wrap gap-4">
+      <div class="flex-1 min-w-48">
+        <label class="block text-xs font-medium text-slate-600 mb-1.5">E-mail de teste</label>
+        <input type="email" name="test_email" value="{{ test_email }}"
+               placeholder="teste@empresa.com"
+               class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
+      </div>
+      <div class="flex-1 min-w-48">
+        <label class="block text-xs font-medium text-slate-600 mb-1.5">WhatsApp de teste</label>
+        <input type="text" name="test_whatsapp" value="{{ test_whatsapp }}"
+               placeholder="5511999990000"
+               class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
+        <p class="text-xs text-slate-400 mt-1">Formato: DDI + DDD + número (sem espaços)</p>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+      <div class="flex gap-3">
+        <button type="submit" name="modo_teste" value="false"
+                class="px-4 py-2 text-sm font-medium bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-colors {{ 'ring-2 ring-slate-400' if not modo_teste else '' }}">
+          Salvar e Manter Inativo
+        </button>
+        <button type="submit" name="modo_teste" value="true"
+                class="px-4 py-2 text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors {{ 'ring-2 ring-amber-600' if modo_teste else '' }}">
+          {% if modo_teste %}✓ Modo Teste Ativo (salvar){% else %}Ativar Modo Teste{% endif %}
+        </button>
+      </div>
+      {% if modo_teste %}
+      <button type="submit" name="modo_teste" value="false"
+              class="text-xs text-red-500 hover:text-red-700 underline">
+        Desativar modo teste
+      </button>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{# ── O que é afetado ───────────────────────────────────────── #}
+<div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+  <div class="px-5 py-3 border-b bg-slate-50">
+    <h3 class="font-semibold text-slate-700 text-sm">O que é interceptado no Modo Teste</h3>
+  </div>
+  <div class="px-5 py-4 space-y-2 text-sm text-slate-600">
+    <div class="flex items-start gap-2">
+      <span class="text-green-500 mt-0.5">✓</span>
+      <span><strong>Alertas automáticos</strong> — destinatários das condições substituídos pelo contato de teste</span>
+    </div>
+    <div class="flex items-start gap-2">
+      <span class="text-slate-300 mt-0.5">○</span>
+      <span class="text-slate-400"><strong>Agendamentos</strong> — interceptação depende da implementação do N8N</span>
+    </div>
+    <div class="flex items-start gap-2">
+      <span class="text-slate-300 mt-0.5">○</span>
+      <span class="text-slate-400"><strong>Solicitações manuais</strong> — não afetadas (usuário escolhe o destino)</span>
+    </div>
+  </div>
+  <div class="px-5 pb-4 text-xs text-slate-400 border-t border-slate-50 pt-3">
+    <strong>Atenção:</strong> Desative o Modo Teste antes de retornar ao uso normal em produção.
+    O estado fica salvo no banco e persiste entre reinicializações.
+  </div>
+</div>

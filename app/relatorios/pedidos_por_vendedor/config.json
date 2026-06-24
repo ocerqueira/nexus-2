@@ -1,0 +1,26 @@
+{
+  "titulo": "Pedidos por Vendedor",
+  "descricao": "Ranking de vendedores por valor de pedidos no período, com ticket médio e top 5 produtos por vendedor. Fonte: ERP Firebird (ARQES13 + ARQES15 + ARQCAD).",
+  "categoria": "comercial",
+  "parametros": [
+    {
+      "nome": "data_inicio",
+      "tipo": "date",
+      "obrigatorio": true,
+      "rotulo": "Data de início (AAAA-MM-DD)"
+    },
+    {
+      "nome": "data_fim",
+      "tipo": "date",
+      "obrigatorio": true,
+      "rotulo": "Data de fim (AAAA-MM-DD)"
+    },
+    {
+      "nome": "cod_empresa",
+      "tipo": "integer",
+      "obrigatorio": false,
+      "padrao": 1,
+      "rotulo": "Código da empresa"
+    }
+  ]
+}

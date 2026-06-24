@@ -1,0 +1,15 @@
+⚠️ *{{ titulo }}*
+🚨 *{{ severidade | upper }}* — Ocorrência individual
+
+*Pedido {{ pedido }}* — {{ nome_cliente }} ({{ codigo_cliente }})
+• Data: {{ data }}
+• Produto: {{ produto }} ({{ cod_produto }})
+• Quantidade: {{ quantidade }}
+• Valor: *R$ {{ "{:,.2f}".format(valor) }}*
+{% if excedente is defined and excedente > 0 %}• Excedente: *+R$ {{ "{:,.2f}".format(excedente) }} ({{ pct_excedente }}%)*
+{% endif %}• Categoria: {{ descricao_categoria or cod_categoria }}
+
+👤 *Vendedor:* {{ nome_vendedor }}
+📞 {{ telefone_vendedor or 'N/D' }}{% if telefone_vendedor2 %} | {{ telefone_vendedor2 }}{% endif %}
+
+_Gerado pelo Nexus em {{ data_geracao }}_

@@ -1,0 +1,365 @@
+{
+  "name": "Nexus — Dispatcher v3 (unificado alertas + relatórios)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "* * * * *" }]
+        }
+      },
+      "id": "schedule",
+      "name": "Cron — a cada minuto",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "NEXUS_URL", "value": "http://192.168.1.100:8000", "type": "string" },
+            { "id": "a2", "name": "EVOLUTION_URL", "value": "https://api.sua-evolution.com", "type": "string" },
+            { "id": "a3", "name": "EVOLUTION_INSTANCE", "value": "minha_instancia", "type": "string" },
+            { "id": "a4", "name": "EVOLUTION_API_KEY", "value": "sua_chave_aqui", "type": "string" },
+            { "id": "a5", "name": "SMTP_HOST", "value": "smtp.gmail.com", "type": "string" },
+            { "id": "a6", "name": "SMTP_PORT", "value": 587, "type": "number" },
+            { "id": "a7", "name": "SMTP_USER", "value": "seu-email@gmail.com", "type": "string" },
+            { "id": "a8", "name": "SMTP_PASSWORD", "value": "xxxx xxxx xxxx xxxx", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "⚙️ Config (Edite aqui)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.NEXUS_URL }}/agendamentos/proximas-execucoes",
+        "options": {}
+      },
+      "id": "get-agendamentos",
+      "name": "GET — proximas-execucoes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            {
+              "id": "cond-total",
+              "leftValue": "={{ $json.total }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        }
+      },
+      "id": "if-tem",
+      "name": "IF — tem_agendamentos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "agendamentos",
+        "options": {}
+      },
+      "id": "split-agendamentos",
+      "name": "Split Out — agendamentos",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            {
+              "id": "cond-tipo",
+              "leftValue": "={{ $json.tipo_recurso }}",
+              "rightValue": "alerta",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "switch-tipo",
+      "name": "Switch — tipo_recurso",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1250, 300]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('⚙️ Config (Edite aqui)').item.json.NEXUS_URL + '/alertas/' + $json.recurso_nome + '/verificar?forcar=true' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ parametros: $json.parametros }) }}",
+        "options": {}
+      },
+      "id": "post-alerta",
+      "name": "POST — verificar alerta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            {
+              "id": "cond-notif",
+              "leftValue": "={{ $json.deve_notificar }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        }
+      },
+      "id": "if-notificar",
+      "name": "IF — deve_notificar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1750, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst ag = $('Split Out — agendamentos').item.json;\nconst dests = resp.destinatarios || [];\nconst cons = resp.mensagens_consolidadas || {};\nconst grupos = resp.grupos_individuais || [];\nconst titulo = (resp.alerta || {}).titulo || 'Alerta';\n\nconst resultados = [];\n\nif (grupos.length > 0) {\n  // Mensagens INDIVIDUAIS: uma por item, por destinatário, por canal\n  for (const dest of dests) {\n    const canais = dest.canais && dest.canais.length > 0 ? dest.canais : ['whatsapp'];\n    for (const canal of canais) {\n      for (const grupo of grupos) {\n        const msgs = grupo.mensagens || {};\n        resultados.push({\n          json: {\n            agendamento_id: ag.id,\n            nome: dest.nome,\n            whatsapp: dest.whatsapp,\n            email: dest.email,\n            canal: canal,\n            mensagem_whatsapp: msgs.whatsapp || cons.whatsapp || '',\n            mensagem_email_assunto: msgs.email_assunto || cons.email_assunto || '',\n            mensagem_email_html: msgs.email_html || cons.email_html || '',\n            titulo: titulo\n          }\n        });\n      }\n    }\n  }\n} else {\n  // Mensagens CONSOLIDADAS: uma por destinatário, por canal\n  for (const dest of dests) {\n    const canais = dest.canais && dest.canais.length > 0 ? dest.canais : ['whatsapp'];\n    for (const canal of canais) {\n      resultados.push({\n        json: {\n          agendamento_id: ag.id,\n          nome: dest.nome,\n          whatsapp: dest.whatsapp,\n          email: dest.email,\n          canal: canal,\n          mensagem_whatsapp: cons.whatsapp || resp.resumo || '',\n          mensagem_email_assunto: cons.email_assunto || ('Alerta: ' + titulo),\n          mensagem_email_html: cons.email_html || ('<p>' + (resp.resumo || 'Alerta Nexus') + '</p>'),\n          titulo: titulo\n        }\n      });\n    }\n  }\n}\n\nreturn resultados;"
+      },
+      "id": "code-dest",
+      "name": "Code — montar destinatários",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 60]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "value": "whatsapp", "output": 0 },
+            { "value": "email", "output": 1 }
+          ]
+        },
+        "dataType": "string",
+        "value1": "={{ $json.canal }}"
+      },
+      "id": "switch-canal",
+      "name": "Switch — canal",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [2250, 60]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_URL + '/message/sendText/' + $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.whatsapp, text: $json.mensagem_whatsapp }) }}",
+        "options": {}
+      },
+      "id": "evo-sendtext",
+      "name": "Evolution — sendText",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2500, -40]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_USER }}",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.mensagem_email_assunto }}",
+        "html": "={{ $json.mensagem_email_html }}",
+        "options": {
+          "host": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_HOST }}",
+          "port": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_PORT }}",
+          "user": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_USER }}",
+          "password": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_PASSWORD }}",
+          "ssl": false
+        }
+      },
+      "id": "smtp-email",
+      "name": "SMTP — enviar email alerta",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [2500, 160]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('⚙️ Config (Edite aqui)').item.json.NEXUS_URL + '/relatorios/' + $json.recurso_nome + '/solicitar' }}",
+        "sendQueryParameters": true,
+        "queryParameters": {
+          "parameters": [{ "name": "formato", "value": "pdf" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ parametros: $json.parametros }) }}",
+        "options": {
+          "responseFormat": "file",
+          "outputDataFieldName": "data"
+        }
+      },
+      "id": "post-relatorio",
+      "name": "POST — solicitar relatório PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst ag = $('Split Out — agendamentos').item.json;\nconst binaryData = (item.binary || {}).data || {};\nconst pdfBase64 = binaryData.data || '';\nconst filename = (ag.recurso_nome || 'relatorio') + '.pdf';\nconst caption = '📊 ' + (ag.recurso_nome || '').replace(/_/g, ' ');\n\nreturn [{\n  json: {\n    agendamento_id: ag.id,\n    usuario_whatsapp: ag.usuario_whatsapp,\n    usuario_email: ag.usuario_email,\n    usuario_nome: ag.usuario_nome,\n    recurso_nome: ag.recurso_nome,\n    pdf_base64: pdfBase64,\n    filename: filename,\n    caption: caption\n  }\n}];"
+      },
+      "id": "code-pdf",
+      "name": "Code — PDF base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_URL + '/message/sendMedia/' + $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $('⚙️ Config (Edite aqui)').item.json.EVOLUTION_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.usuario_whatsapp, mediatype: 'document', mimetype: 'application/pdf', caption: $json.caption, media: $json.pdf_base64, fileName: $json.filename }) }}",
+        "options": {}
+      },
+      "id": "evo-sendmedia",
+      "name": "Evolution — sendMedia PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 500]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_USER }}",
+        "toEmail": "={{ $json.usuario_email }}",
+        "subject": "=Relatório: {{ $json.recurso_nome.replace(/_/g, ' ') }}",
+        "text": "=Segue em anexo o relatório {{ $json.recurso_nome.replace(/_/g, ' ') }} gerado pelo Nexus.",
+        "options": {
+          "host": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_HOST }}",
+          "port": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_PORT }}",
+          "user": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_USER }}",
+          "password": "={{ $('⚙️ Config (Edite aqui)').item.json.SMTP_PASSWORD }}",
+          "ssl": false,
+          "attachments": [
+            {
+              "fileName": "={{ $json.filename }}",
+              "data": "={{ $json.pdf_base64 }}",
+              "mimeType": "application/pdf"
+            }
+          ]
+        }
+      },
+      "id": "smtp-relatorio",
+      "name": "SMTP — enviar PDF relatório",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [2000, 680]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('⚙️ Config (Edite aqui)').item.json.NEXUS_URL + '/agendamentos/' + $('Split Out — agendamentos').item.json.id + '/marcar-executado' }}",
+        "options": {}
+      },
+      "id": "marcar-executado",
+      "name": "POST — marcar-executado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2750, 300]
+    }
+  ],
+  "connections": {
+    "Cron — a cada minuto": {
+      "main": [[{ "node": "⚙️ Config (Edite aqui)", "type": "main", "index": 0 }]]
+    },
+    "⚙️ Config (Edite aqui)": {
+      "main": [[{ "node": "GET — proximas-execucoes", "type": "main", "index": 0 }]]
+    },
+    "GET — proximas-execucoes": {
+      "main": [[{ "node": "IF — tem_agendamentos?", "type": "main", "index": 0 }]]
+    },
+    "IF — tem_agendamentos?": {
+      "main": [
+        [{ "node": "Split Out — agendamentos", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split Out — agendamentos": {
+      "main": [[{ "node": "Switch — tipo_recurso", "type": "main", "index": 0 }]]
+    },
+    "Switch — tipo_recurso": {
+      "main": [
+        [{ "node": "POST — verificar alerta", "type": "main", "index": 0 }],
+        [{ "node": "POST — solicitar relatório PDF", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST — verificar alerta": {
+      "main": [[{ "node": "IF — deve_notificar?", "type": "main", "index": 0 }]]
+    },
+    "IF — deve_notificar?": {
+      "main": [
+        [{ "node": "Code — montar destinatários", "type": "main", "index": 0 }],
+        [{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code — montar destinatários": {
+      "main": [[{ "node": "Switch — canal", "type": "main", "index": 0 }]]
+    },
+    "Switch — canal": {
+      "main": [
+        [{ "node": "Evolution — sendText", "type": "main", "index": 0 }],
+        [{ "node": "SMTP — enviar email alerta", "type": "main", "index": 0 }]
+      ]
+    },
+    "Evolution — sendText": {
+      "main": [[{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]]
+    },
+    "SMTP — enviar email alerta": {
+      "main": [[{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]]
+    },
+    "POST — solicitar relatório PDF": {
+      "main": [[{ "node": "Code — PDF base64", "type": "main", "index": 0 }]]
+    },
+    "Code — PDF base64": {
+      "main": [
+        [{ "node": "Evolution — sendMedia PDF", "type": "main", "index": 0 }],
+        [{ "node": "SMTP — enviar PDF relatório", "type": "main", "index": 0 }]
+      ]
+    },
+    "Evolution — sendMedia PDF": {
+      "main": [[{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]]
+    },
+    "SMTP — enviar PDF relatório": {
+      "main": [[{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]]
+    }
+  }
+}

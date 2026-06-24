@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5; }
+    .header { background: #ef4444; color: white; padding: 15px 20px; border-radius: 4px; }
+    .header h1 { margin: 0; font-size: 18px; }
+    .header .meta { font-size: 11px; opacity: 0.9; margin-top: 4px; }
+    .detalhe { background: #f9fafb; padding: 15px; border: 1px solid #e5e7eb; border-radius: 4px; margin: 15px 0; }
+    .linha { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
+    .linha-label { color: #6b7280; font-size: 11px; }
+    .linha-valor { font-weight: 600; }
+    .critico { color: #ef4444; font-weight: bold; }
+    .vendedor { background: #fef3c7; padding: 12px; border-radius: 4px; margin: 15px 0; }
+    .footer { color: #9ca3af; font-size: 11px; margin-top: 20px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🚨 Item com Comprimento Excedente</h1>
+    <div class="meta">{{ severidade | upper }} • Pedido {{ pedido }} • {{ data_geracao }}</div>
+  </div>
+
+  <div class="detalhe">
+    <div class="linha">
+      <span class="linha-label">Pedido</span>
+      <span class="linha-valor">{{ pedido }}</span>
+    </div>
+    <div class="linha">
+      <span class="linha-label">Cliente</span>
+      <span class="linha-valor">{{ nome_cliente }}</span>
+    </div>
+    <div class="linha">
+      <span class="linha-label">Produto</span>
+      <span class="linha-valor">{{ produto }} ({{ cod_produto }})</span>
+    </div>
+    <div class="linha">
+      <span class="linha-label">Comprimento</span>
+      <span class="linha-valor critico">{{ "%.2f"|format(comprimento_m) }}m</span>
+    </div>
+    <div class="linha">
+      <span class="linha-label">Origem da Medida</span>
+      <span class="linha-valor">{{ origem_medida }}</span>
+    </div>
+    <div class="linha">
+      <span class="linha-label">Carga</span>
+      <span class="linha-valor">{{ nrocarga }} — {{ data }}</span>
+    </div>
+  </div>
+
+  <div class="vendedor">
+    <strong>👤 Vendedor Responsável</strong><br>
+    {{ nome_vendedor }}<br>
+    📞 {{ telefone_vendedor or 'N/D' }}
+    {% if telefone_vendedor2 %} | {{ telefone_vendedor2 }}{% endif %}
+  </div>
+
+  <div class="footer">
+    Notificação gerada pelo Nexus em {{ data_geracao }}
+  </div>
+</body>
+</html>

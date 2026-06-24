@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{#
+  Template do relatório: _modelo_relatorio
+  Variáveis disponíveis (payload do processador):
+    total               int
+    periodo             str      "MM/YYYY"
+    registros           list     linhas detalhadas
+    grupos              list     agrupamento por categoria
+    top5                list     top 5 por valor
+    resumo_global       dict     {valor_total, meta_total, atingimento_global_pct, qtd_total, qtd_acima_meta, qtd_abaixo_meta}
+    grafico_barras      str|None data URI base64
+    grafico_tendencia   str|None data URI base64
+    grafico_pizza       str|None data URI base64
+    grafico_agrupado    str|None data URI base64
+
+  Variáveis injetadas pelo renderizador (sempre disponíveis):
+    titulo       str
+    subtitulo    str
+    data_geracao str
+#}
+
+{% block estilos_extras %}
+<style>
+  /* Gráficos */
+  .graficos-linha   { display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; }
+  .grafico-wrap     { flex: 1; min-width: 280px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; }
+  .grafico-wrap img { width: 100%; height: auto; display: block; }
+  .grafico-legenda  { text-align: center; font-size: 8pt; color: #6b7280; margin-top: 5px; font-style: italic; }
+
+  /* Variações de card por status */
+  .card-verde    { border-left-color: #10b981 !important; }
+  .card-vermelho { border-left-color: #ef4444 !important; }
+  .card-azul     { border-left-color: #2563eb !important; }
+  .card-amarelo  { border-left-color: #f59e0b !important; }
+
+  /* Estado vazio */
+  .sem-dados { color: #9ca3af; font-style: italic; text-align: center; padding: 40px; }
+
+  /* Barra de atingimento inline */
+  .barra-wrap   { display: flex; align-items: center; gap: 6px; }
+  .barra        { flex: 1; background: #e5e7eb; border-radius: 4px; height: 8px; overflow: hidden; }
+  .barra-fill   { height: 100%; border-radius: 4px; }
+  .fill-verde   { background: #10b981; }
+  .fill-amarelo { background: #f59e0b; }
+  .fill-vermelho{ background: #ef4444; }
+</style>
+{% endblock %}
+
+
+{% block conteudo %}
+
+{% if total == 0 %}
+<div class="sem-dados">
+  Nenhum dado encontrado para o período {{ periodo }}.
+</div>
+
+{% else %}
+
+<!-- ═══════════════════════════════════════════════════════════════
+     KPI Cards
+═══════════════════════════════════════════════════════════════ -->
+<div class="cards">
+  <div class="card card-azul">
+    <div class="card-label">Registros</div>
+    <div class="card-valor">{{ total }}</div>
+  </div>
+  <div class="card card-azul">
+    <div class="card-label">Valor Total</div>
+    <div class="card-valor">R$ {{ "{:,.0f}".format(resumo_global.valor_total) }}</div>
+  </div>
+  {% if resumo_global.meta_total > 0 %}
+  <div class="card card-azul">
+    <div class="card-label">Meta Total</div>
+    <div class="card-valor">R$ {{ "{:,.0f}".format(resumo_global.meta_total) }}</div>
+  </div>
+  <div class="card {% if resumo_global.atingimento_global_pct >= 100 %}card-verde{% elif resumo_global.atingimento_global_pct >= 80 %}card-amarelo{% else %}card-vermelho{% endif %}">
+    <div class="card-label">Atingimento</div>
+    <div class="card-valor">{{ resumo_global.atingimento_global_pct }}%</div>
+  </div>
+  <div class="card card-verde">
+    <div class="card-label">Acima da Meta</div>
+    <div class="card-valor" style="font-size: 14pt">{{ resumo_global.qtd_acima_meta }}</div>
+  </div>
+  <div class="card card-vermelho">
+    <div class="card-label">Abaixo da Meta</div>
+    <div class="card-valor" style="font-size: 14pt">{{ resumo_global.qtd_abaixo_meta }}</div>
+  </div>
+  {% endif %}
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     Gráfico de tendência (largura total)
+═══════════════════════════════════════════════════════════════ -->
+{% if grafico_tendencia %}
+<div class="graficos-linha">
+  <div class="grafico-wrap" style="flex: 2">
+    <img src="{{ grafico_tendencia }}" alt="Tendência">
+    <div class="grafico-legenda">Figura 1 — Tendência de valores no período {{ periodo }}</div>
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     Pizza + Agrupado lado a lado
+═══════════════════════════════════════════════════════════════ -->
+{% if grafico_pizza or grafico_agrupado %}
+<div class="graficos-linha">
+  {% if grafico_pizza %}
+  <div class="grafico-wrap">
+    <img src="{{ grafico_pizza }}" alt="Distribuição por categoria">
+    <div class="grafico-legenda">Figura 2 — Distribuição por categoria</div>
+  </div>
+  {% endif %}
+  {% if grafico_agrupado %}
+  <div class="grafico-wrap" style="flex: 2">
+    <img src="{{ grafico_agrupado }}" alt="Realizado vs Meta">
+    <div class="grafico-legenda">Figura 3 — Realizado vs Meta por categoria</div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     Top 5
+═══════════════════════════════════════════════════════════════ -->
+{% if top5 %}
+<div class="secao">
+  <div class="secao-titulo">🏆 Top 5</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Nome</th>
+        <th>Categoria</th>
+        <th class="texto-direita">Valor</th>
+        {% if top5[0].meta is defined %}<th class="texto-direita">Meta</th>{% endif %}
+        {% if top5[0].atingimento_pct is defined %}<th class="texto-centro">Atingimento</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in top5 %}
+      <tr>
+        <td class="negrito">{{ loop.index }}º</td>
+        <td class="negrito">{{ r.nome }}</td>
+        <td>{{ r.cod_categoria }}</td>
+        <td class="texto-direita destaque">R$ {{ "{:,.0f}".format(r.valor) }}</td>
+        {% if r.meta is defined %}
+        <td class="texto-direita">R$ {{ "{:,.0f}".format(r.meta) }}</td>
+        {% endif %}
+        {% if r.atingimento_pct is defined %}
+        <td class="texto-centro">
+          {% if r.atingimento_pct >= 100 %}
+          <span class="badge badge-sucesso">{{ r.atingimento_pct }}%</span>
+          {% elif r.atingimento_pct >= 80 %}
+          <span class="badge badge-aviso">{{ r.atingimento_pct }}%</span>
+          {% else %}
+          <span class="badge badge-erro">{{ r.atingimento_pct }}%</span>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     Gráfico de barras (ranking completo)
+═══════════════════════════════════════════════════════════════ -->
+{% if grafico_barras %}
+<div class="graficos-linha">
+  <div class="grafico-wrap" style="flex: 2">
+    <img src="{{ grafico_barras }}" alt="Ranking por valor">
+    <div class="grafico-legenda">Figura 4 — Ranking por valor em {{ periodo }}</div>
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     Tabela por grupo/categoria
+═══════════════════════════════════════════════════════════════ -->
+{% if grupos %}
+<div class="secao">
+  <div class="secao-titulo">Resumo por Categoria</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Categoria</th>
+        <th class="texto-centro">Qtd</th>
+        <th class="texto-direita">Valor Total</th>
+        <th class="texto-direita">Valor Médio</th>
+        <th class="texto-direita">Maior Valor</th>
+        {% if grupos[0].meta_total is defined %}<th class="texto-direita">Meta</th>{% endif %}
+        {% if grupos[0].atingimento_pct is defined %}<th class="texto-centro">Atingimento</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in grupos %}
+      <tr>
+        <td class="negrito">{{ g.cod_categoria }}</td>
+        <td class="texto-centro">{{ g.qtd }}</td>
+        <td class="texto-direita">R$ {{ "{:,.0f}".format(g.valor_total) }}</td>
+        <td class="texto-direita">R$ {{ "{:,.0f}".format(g.valor_medio) }}</td>
+        <td class="texto-direita">R$ {{ "{:,.0f}".format(g.valor_max) }}</td>
+        {% if g.meta_total is defined %}
+        <td class="texto-direita">R$ {{ "{:,.0f}".format(g.meta_total) }}</td>
+        {% endif %}
+        {% if g.atingimento_pct is defined %}
+        <td>
+          <div class="barra-wrap">
+            <span class="negrito" style="min-width: 42px; text-align: right">{{ g.atingimento_pct }}%</span>
+            <div class="barra">
+              <div class="barra-fill {% if g.atingimento_pct >= 100 %}fill-verde{% elif g.atingimento_pct >= 80 %}fill-amarelo{% else %}fill-vermelho{% endif %}"
+                   style="width: {{ [g.atingimento_pct, 100] | min }}%"></div>
+            </div>
+          </div>
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     Tabela detalhada (todos os registros)
+═══════════════════════════════════════════════════════════════ -->
+{% if registros %}
+<div class="secao">
+  <div class="secao-titulo">Detalhamento — {{ periodo }}</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Pedido</th>
+        <th>Data</th>
+        <th>Nome</th>
+        <th>Produto</th>
+        <th class="texto-centro">Qtd</th>
+        <th class="texto-direita">Valor Unit.</th>
+        <th class="texto-direita">Valor Total</th>
+        <th class="texto-centro">Categoria</th>
+        <th>Vendedor</th>
+        {% if registros[0].atingimento_pct is defined %}<th class="texto-centro">Ating.</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in registros %}
+      <tr>
+        <td class="negrito">{{ r.pedido }}</td>
+        <td>{{ r.data }}</td>
+        <td>{{ r.nome }}</td>
+        <td>{{ r.produto }}<br><small>{{ r.cod_produto }}</small></td>
+        <td class="texto-centro">{{ r.quantidade }}</td>
+        <td class="texto-direita">R$ {{ "{:,.2f}".format(r.valor_unit) }}</td>
+        <td class="texto-direita destaque">R$ {{ "{:,.2f}".format(r.valor) }}</td>
+        <td class="texto-centro">{{ r.cod_categoria }}</td>
+        <td>{{ r.nome_vendedor }}</td>
+        {% if r.atingimento_pct is defined %}
+        <td class="texto-centro">
+          {% if r.atingimento_pct >= 100 %}
+          <span style="color: #10b981; font-weight: 600">{{ r.atingimento_pct }}%</span>
+          {% else %}
+          <span style="color: #ef4444; font-weight: 600">{{ r.atingimento_pct }}%</span>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endif %} {# fim do if total == 0 #}
+{% endblock %}

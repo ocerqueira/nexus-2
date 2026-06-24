@@ -1,0 +1,21 @@
+{
+  "titulo": "Dashboard de Conexões",
+  "descricao": "Visão consolidada com gráficos e estatísticas das conexões cadastradas no Nexus. Demonstra uso de pandas para transformações e matplotlib para gráficos em PDF.",
+  "categoria": "sistema",
+  "parametros": [
+    {
+      "nome": "apenas_ativas",
+      "tipo": "boolean",
+      "obrigatorio": false,
+      "padrao": false,
+      "rotulo": "Considerar apenas conexões ativas?"
+    },
+    {
+      "nome": "tipo_banco",
+      "tipo": "string",
+      "obrigatorio": false,
+      "rotulo": "Filtrar por tipo de banco",
+      "valores_permitidos": ["postgres", "firebird", "mysql"]
+    }
+  ]
+}

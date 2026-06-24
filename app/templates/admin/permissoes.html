@@ -1,0 +1,121 @@
+{% from "admin/_macros.html" import badge, btn_acao, paginacao %}
+
+{% if msg %}
+{% set tipo_cls = "bg-green-50 border-green-200 text-green-700" if msg_tipo == "ok" else "bg-red-50 border-red-200 text-red-700" %}
+<div class="mb-4 px-4 py-3 rounded-lg border text-xs {{ tipo_cls }}">{{ msg }}</div>
+{% endif %}
+
+{# ── Toolbar ──────────────────────────────────────────── #}
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <div class="relative flex-1 min-w-48">
+    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    </svg>
+    <input type="text" name="busca" value="{{ busca }}"
+           placeholder="Buscar por usuário ou recurso..."
+           class="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+           hx-get="/admin/permissoes" hx-trigger="keyup changed delay:400ms"
+           hx-target="#main" hx-swap="innerHTML"
+           hx-include="[name='tipo_filtro']">
+  </div>
+
+  <div class="flex gap-1.5">
+    {% for val, label in [("", "Todos"), ("relatorio", "Relatório"), ("alerta", "Alerta")] %}
+    <button type="button"
+            class="px-2.5 py-1.5 text-xs rounded-full border transition-colors
+                   {{ 'bg-indigo-600 text-white border-indigo-600' if tipo_filtro == val else 'bg-white text-slate-600 border-slate-300 hover:border-slate-400' }}"
+            hx-get="/admin/permissoes?tipo_filtro={{ val }}&busca={{ busca }}"
+            hx-target="#main" hx-swap="innerHTML">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  <input type="hidden" name="tipo_filtro" value="{{ tipo_filtro }}">
+
+  <button class="ml-auto inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+          hx-get="/admin/permissoes/form" hx-target="#modal-body" hx-swap="innerHTML">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Nova Permissão
+  </button>
+</div>
+
+{# ── Grupos por usuário ────────────────────────────────── #}
+{% if not grupos %}
+<div class="bg-white rounded-xl border shadow-sm p-12 text-center">
+  <svg class="w-10 h-10 text-slate-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+  </svg>
+  <p class="text-slate-400">Nenhuma permissão encontrada</p>
+</div>
+{% else %}
+<div class="space-y-3">
+{% for grupo in grupos %}
+{% set grupo_id = "perm-grupo-" ~ loop.index %}
+
+<div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+
+  {# Cabeçalho do grupo (usuário) #}
+  <button class="w-full flex items-center gap-2 px-5 py-3 bg-slate-50/70 border-b text-left"
+          onclick="toggleGrupo('{{ grupo_id }}', this)">
+    <div class="w-8 h-8 bg-violet-100 rounded-full flex items-center justify-center
+                text-violet-700 font-bold text-sm flex-shrink-0">
+      {{ grupo.usuario_nome[0] | upper if grupo.usuario_nome else "?" }}
+    </div>
+    <span class="font-semibold text-slate-800 text-sm">{{ grupo.usuario_nome }}</span>
+    <span class="text-xs text-slate-400">{{ grupo.permissoes | length }} permissão(ões)</span>
+    <svg class="grupo-chevron w-4 h-4 text-slate-400 ml-auto transition-transform duration-150"
+         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </button>
+
+  {# Tabela de permissões do usuário #}
+  <div id="{{ grupo_id }}">
+    <table class="w-full">
+      <thead>
+        <tr class="text-left text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+          <th class="px-5 py-2.5">Tipo</th>
+          <th class="px-5 py-2.5">Recurso</th>
+          <th class="px-5 py-2.5 text-center">Solicitar</th>
+          <th class="px-5 py-2.5 text-center">Agendar</th>
+          <th class="px-5 py-2.5 text-center">Limite/dia</th>
+          <th class="px-5 py-2.5 text-slate-300">Concedida</th>
+          <th class="px-5 py-2.5 text-right">Ação</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-50">
+        {% for p in grupo.permissoes %}
+        {% set tipo_cor = "violet" if p.tipo_recurso == "relatorio" else "orange" %}
+        {% set zebra = "bg-white" if loop.index is odd else "bg-slate-50" %}
+        <tr class="{{ zebra }} hover:bg-indigo-50/30 transition-colors">
+          <td class="px-5 py-3">{{ badge(p.tipo_recurso, tipo_cor) }}</td>
+          <td class="px-5 py-3 text-slate-700 text-sm">{{ p.recurso_nome or "ID " ~ p.recurso_id }}</td>
+          <td class="px-5 py-3 text-center">
+            {{ badge("✓", "green") if p.pode_solicitar else badge("✗", "gray") }}
+          </td>
+          <td class="px-5 py-3 text-center">
+            {{ badge("✓", "green") if p.pode_agendar else badge("✗", "gray") }}
+          </td>
+          <td class="px-5 py-3 text-center text-slate-600 text-sm">{{ p.limite_diario }}</td>
+          <td class="px-5 py-3 text-xs text-slate-400">{{ p.criado_em_fmt }}</td>
+          <td class="px-5 py-3 text-right">
+            {{ btn_acao("Revogar",
+                'hx-delete="/admin/permissoes/' ~ p.id ~ '" hx-target="#main" hx-swap="innerHTML" hx-confirm="Revogar esta permissão permanentemente?"',
+                "danger") }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endfor %}
+</div>
+{% endif %}
+
+{# ── Paginação por usuário ─────────────────────────────── #}
+{% set url_base = "/admin/permissoes?busca=" ~ busca ~ "&tipo_filtro=" ~ tipo_filtro %}
+{{ paginacao(pagina, total_paginas, total, "usuário(s) com permissões", url_base) }}

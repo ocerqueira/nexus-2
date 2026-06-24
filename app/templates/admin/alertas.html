@@ -1,0 +1,108 @@
+{% from "admin/_macros.html" import badge, btn_acao %}
+
+{% if msg %}
+{% set tipo_cls = "bg-green-50 border-green-200 text-green-700" if msg_tipo == "ok" else "bg-red-50 border-red-200 text-red-700" %}
+<div class="mb-4 px-4 py-3 rounded-lg border text-xs {{ tipo_cls }}">{{ msg }}</div>
+{% endif %}
+
+{# ── Filtro por status ─────────────────────────────────── #}
+<div class="flex items-center gap-2 mb-4">
+  {% for val, label in [("", "Todos"), ("ativo", "Ativos"), ("inativo", "Inativos")] %}
+  <button type="button"
+          class="px-3 py-1.5 text-xs rounded-full border transition-colors
+                 {{ 'bg-indigo-600 text-white border-indigo-600' if status_filtro == val else 'bg-white text-slate-600 border-slate-300 hover:border-indigo-300' }}"
+          hx-get="/admin/alertas?status_filtro={{ val }}"
+          hx-target="#main" hx-swap="innerHTML">{{ label }}</button>
+  {% endfor %}
+  <span class="text-xs text-slate-400 ml-auto">{{ total_alertas }} alerta(s)</span>
+</div>
+
+{% if not grupos %}
+<div class="bg-white rounded-xl border shadow-sm p-12 text-center">
+  <svg class="w-10 h-10 text-slate-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+  </svg>
+  <p class="text-slate-400">Nenhum alerta encontrado</p>
+</div>
+{% else %}
+
+{% set sev_cfg = {
+  "critico": {"label": "Crítico", "border": "border-l-red-500",    "hbg": "bg-red-50",    "htxt": "text-red-700",    "cor": "red"},
+  "aviso":   {"label": "Aviso",   "border": "border-l-yellow-400", "hbg": "bg-yellow-50", "htxt": "text-yellow-700", "cor": "yellow"},
+  "info":    {"label": "Info",    "border": "border-l-blue-400",   "hbg": "bg-blue-50",   "htxt": "text-blue-700",   "cor": "blue"},
+} %}
+
+{% set cor_st = {"ativo": "green", "inativo": "gray", "removido": "red"} %}
+
+<div class="space-y-3">
+{% for grupo in grupos %}
+{% set cfg = sev_cfg.get(grupo.severidade, {"label": grupo.severidade, "border": "border-l-slate-200", "hbg": "bg-slate-50", "htxt": "text-slate-600", "cor": "gray"}) %}
+{% set grupo_id = "alerta-grupo-" ~ loop.index %}
+
+<div class="bg-white rounded-xl border border-l-4 {{ cfg.border }} shadow-sm overflow-hidden">
+
+  {# Cabeçalho do grupo (severidade) — clicável para colapsar #}
+  <button class="w-full flex items-center gap-3 px-5 py-3 {{ cfg.hbg }} border-b text-left"
+          onclick="toggleGrupo('{{ grupo_id }}', this)">
+    {{ badge(cfg.label, cfg.cor) }}
+    <span class="text-xs text-slate-400">{{ grupo.alertas | length }} alerta(s)</span>
+    <svg class="grupo-chevron w-4 h-4 text-slate-400 ml-auto transition-transform duration-150"
+         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </button>
+
+  {# Linhas de alertas #}
+  <div id="{{ grupo_id }}" class="divide-y divide-slate-50">
+    {% for a in grupo.alertas %}
+    {% set zebra = "bg-white" if loop.index is odd else "bg-slate-50" %}
+    <div class="px-5 py-3.5 {{ zebra }} flex items-center gap-4">
+
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-semibold text-slate-800 text-sm">{{ a.titulo }}</span>
+          {{ badge(a.status, cor_st.get(a.status, "gray")) }}
+        </div>
+        <div class="text-xs text-slate-400 mt-0.5 font-mono">{{ a.nome }}</div>
+      </div>
+
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <button class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
+                       bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200
+                       rounded-lg transition-colors"
+                hx-get="/admin/alertas/{{ a.id }}/condicoes"
+                hx-target="#drawer-body" hx-swap="innerHTML"
+                data-drawer-title="Condições — {{ a.titulo }}"
+                onclick="openDrawer(this.dataset.drawerTitle)">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          {{ a.condicoes_ativas or 0 }} condição(ões)
+        </button>
+
+        {% if a.status == "ativo" %}
+        {{ btn_acao("Testar",
+            'hx-post="/admin/alertas/' ~ a.id ~ '/disparar" hx-swap="outerHTML"',
+            "ghost") }}
+        {{ btn_acao("Inativar",
+            'hx-post="/admin/alertas/' ~ a.id ~ '/inativar" hx-target="#main" hx-swap="innerHTML" hx-confirm="Inativar ' ~ a.nome ~ '?"',
+            "danger") }}
+        {% elif a.status == "inativo" %}
+        {{ btn_acao("Ativar",
+            'hx-post="/admin/alertas/' ~ a.id ~ '/ativar" hx-target="#main" hx-swap="innerHTML"',
+            "success") }}
+        {% else %}<span class="text-xs text-slate-400">—</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endfor %}
+</div>
+{% endif %}
+
+<p class="text-xs text-slate-400 mt-3">Use <strong>Sync FS</strong> para detectar novos alertas do filesystem.</p>

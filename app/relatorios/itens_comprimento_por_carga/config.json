@@ -1,0 +1,27 @@
+{
+  "titulo": "Itens com Comprimento Excedente por Carga",
+  "descricao": "Lista itens de telha e SBX com comprimento acima do limite, consolidados por carga. Exibe numero e nome da carga, pedido, item, cliente, vendedor e metragem.",
+  "parametros": [
+    {
+      "nome": "data_inicio",
+      "tipo": "date",
+      "obrigatorio": false,
+      "padrao": null,
+      "rotulo": "Data de inicio (AAAA-MM-DD). Padrao: dia util anterior."
+    },
+    {
+      "nome": "data_fim",
+      "tipo": "date",
+      "obrigatorio": false,
+      "padrao": null,
+      "rotulo": "Data de fim (AAAA-MM-DD). Padrao: igual a data_inicio."
+    },
+    {
+      "nome": "cod_empresa",
+      "tipo": "integer",
+      "obrigatorio": false,
+      "padrao": 1,
+      "rotulo": "Codigo da empresa (padrao: 1)"
+    }
+  ]
+}

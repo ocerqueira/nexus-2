@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+
+{% block estilos_extras %}
+<style>
+    /* ── Identidade visual NOROAÇO ─────────────────────────────────── */
+    :root {
+        --preto:        #2C2925;
+        --preto-2:      #4D4D4C;
+        --amarelo:      #FFB71B;
+        --laranja:      #F58220;
+        --cinza:        #8B8B8B;
+        --cinza-claro:  #E4E4E2;
+        --linha:        #ECECEA;
+        --zebra:        #FAFAF9;
+        --fundo-th:     #F4F3F1;
+    }
+
+    /* ── @page: paisagem + rodapé de marca (sobrescreve base.html) ─── */
+    @page {
+        size: A4 landscape;
+        margin: 2.45cm 1.1cm 1.45cm 1.1cm;
+        @top-left   { content: none; }
+        @top-right  { content: none; }
+        @top-center {
+            content: element(cabecalho-running);
+            vertical-align: bottom;
+        }
+        @bottom-left {
+            content: "nexus";
+            font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
+            font-size: 8pt;
+            font-weight: 700;
+            letter-spacing: 2.5px;
+            color: var(--cinza);
+        }
+        @bottom-center {
+            content: "NOROAÇO · FERRO E AÇO";
+            font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
+            font-size: 6.5pt;
+            letter-spacing: 1.5px;
+            color: var(--cinza-claro);
+        }
+        @bottom-right {
+            content: "Página " counter(page) " de " counter(pages);
+            font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
+            font-size: 8pt;
+            color: var(--preto-2);
+        }
+    }
+
+    /* ── Tipografia (sobrescreve base.html) ───────────────────────── */
+    body {
+        font-family: 'Futura', 'Century Gothic', 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
+        color: var(--preto);
+        font-size: 9pt;
+        -weasy-hyphens: none;
+    }
+
+    /* Rodapé do base.html substituído pelo @page @bottom */
+    .rodape { display: none; }
+
+    /* ── Running header ────────────────────────────────────────────── */
+    .running-header { position: running(cabecalho-running); }
+
+    .cab-wrap {
+        width: calc(100% + 2.2cm);  /* sangra 1.1cm em cada lado para atingir largura total da folha */
+        margin-left: -1.1cm;
+        background: var(--preto);
+        border-bottom: 3px solid var(--amarelo);
+        display: table;
+        table-layout: fixed;
+        padding: 7px 12px;
+    }
+    .cab-marca { display: table-cell; width: 38%; vertical-align: middle; white-space: nowrap; }
+    .cab-info  { display: table-cell; vertical-align: middle; text-align: right; }
+
+    .wordmark {
+        font-weight: 800;
+        font-size: 16pt;
+        letter-spacing: -0.5px;
+        color: #FFFFFF;
+        line-height: 1;
+    }
+    .wordmark .n {
+        display: inline-block;
+        background: var(--amarelo);
+        color: var(--preto);
+        padding: 0 3px;
+        margin-right: 1px;
+        transform: skewX(-6deg);
+    }
+    .tagline {
+        font-size: 6.5pt;
+        font-weight: 700;
+        letter-spacing: 4px;
+        color: var(--amarelo);
+        margin-top: 3px;
+    }
+    .doc-titulo {
+        font-size: 11.5pt;
+        font-weight: 700;
+        color: #FFFFFF;
+        letter-spacing: 0.3px;
+        line-height: 1.1;
+    }
+    .doc-params {
+        margin-top: 4px;
+        font-size: 7.5pt;
+        color: var(--cinza-claro);
+        line-height: 1.35;
+    }
+    .doc-params .lbl { color: var(--amarelo); font-weight: 700; letter-spacing: 0.5px; }
+    .doc-params .sep { color: var(--preto-2); padding: 0 5px; }
+
+    /* ── KPIs ──────────────────────────────────────────────────────── */
+    .kpi-faixa {
+        display: table;
+        table-layout: fixed;
+        width: calc(100% + 18px);
+        border-collapse: separate;
+        border-spacing: 9px 0;
+        margin: 2px 0 16px -9px;
+    }
+    .kpi-card {
+        display: table-cell;
+        width: 33.33%;
+        background: var(--preto);
+        border-radius: 5px;
+        border-left: 4px solid var(--amarelo);
+        padding: 11px 14px;
+        vertical-align: middle;
+    }
+    .kpi-card.laranja { border-left-color: var(--laranja); }
+    .kpi-card.cinza   { border-left-color: var(--cinza); }
+    .kpi-valor {
+        font-size: 22pt;
+        font-weight: 800;
+        color: var(--amarelo);
+        line-height: 1;
+    }
+    .kpi-card.laranja .kpi-valor { color: var(--laranja); }
+    .kpi-card.cinza   .kpi-valor { color: #FFFFFF; }
+    .kpi-label {
+        margin-top: 4px;
+        font-size: 7.5pt;
+        font-weight: 600;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: var(--cinza-claro);
+    }
+
+    /* ── Blocos por carga ──────────────────────────────────────────── */
+    .carga-bloco {
+        margin-bottom: 13px;
+        border: 1px solid var(--cinza-claro);
+        border-radius: 5px;
+        overflow: hidden;
+        page-break-inside: avoid;
+    }
+    .carga-header {
+        background: var(--preto);
+        display: table;
+        width: 100%;
+        padding: 7px 12px;
+    }
+    .ch-cell { display: table-cell; vertical-align: middle; }
+    .carga-numero {
+        font-size: 10pt;
+        font-weight: 800;
+        color: var(--amarelo);
+        white-space: nowrap;
+        padding-right: 14px;
+    }
+    .carga-numero::before {
+        content: "N";
+        display: inline-block;
+        background: var(--amarelo);
+        color: var(--preto);
+        font-weight: 800;
+        font-size: 8pt;
+        padding: 0 4px;
+        margin-right: 7px;
+        transform: skewX(-6deg);
+    }
+    .carga-nome {
+        width: 100%;
+        color: var(--cinza-claro);
+        font-weight: 400;
+        font-size: 9pt;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .carga-meta {
+        text-align: right;
+        font-size: 7.5pt;
+        color: var(--cinza);
+        white-space: nowrap;
+        padding: 0 14px;
+    }
+    .carga-meta .lbl { color: var(--amarelo); font-weight: 700; }
+    .badge-contagem {
+        display: inline-block;
+        background: var(--laranja);
+        color: #FFFFFF;
+        border-radius: 10px;
+        padding: 2px 10px;
+        font-size: 7.5pt;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .ch-badge { text-align: right; white-space: nowrap; }
+
+    /* ── Tabela ────────────────────────────────────────────────────── */
+    .carga-tabela {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 8.5pt;
+    }
+    .carga-tabela th {
+        background: var(--fundo-th);
+        color: var(--preto-2);
+        font-weight: 700;
+        font-size: 7pt;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+        padding: 5px 12px;
+        text-align: left;
+        border-bottom: 2px solid var(--amarelo);
+        white-space: nowrap;
+    }
+    .carga-tabela td {
+        padding: 5px 12px;
+        border-bottom: 1px solid var(--linha);
+        color: var(--preto);
+        vertical-align: middle;
+    }
+    .carga-tabela tbody tr:nth-child(even) td { background: var(--zebra); }
+    .carga-tabela tr:last-child td { border-bottom: none; }
+
+    .col-c   { text-align: center; }
+    .col-num { text-align: right; }
+    .col-comprimento {
+        text-align: right;
+        font-weight: 800;
+        color: var(--laranja);
+        white-space: nowrap;
+        font-size: 9pt;
+    }
+    .col-excedente {
+        text-align: right;
+        font-size: 7.5pt;
+        font-weight: 700;
+        color: var(--cinza);
+        white-space: nowrap;
+    }
+    .produto-cel {
+        max-width: 230px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .badge-tipo {
+        display: inline-block;
+        padding: 1px 7px;
+        border-radius: 3px;
+        font-size: 6.5pt;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+    }
+    .badge-telha { background: var(--preto-2); color: #FFFFFF; }
+    .badge-sbx   { background: var(--amarelo); color: var(--preto); }
+
+    .pedido-num { font-weight: 800; color: var(--preto); }
+    .sem-dados  { color: var(--cinza); font-style: italic; text-align: center; padding: 60px 0; font-size: 10pt; }
+</style>
+{% endblock %}
+
+
+{% block cabecalho %}
+{# Running element: retirado do fluxo pelo WeasyPrint, repetido em @top-center em toda página #}
+<div class="running-header">
+    <div class="cab-wrap">
+        <div class="cab-marca">
+            {% if logo_b64 %}
+            <img src="{{ logo_b64 }}" style="height: 28px; max-width: 90px; object-fit: contain; vertical-align: middle; margin-right: 10px; filter: brightness(0) invert(1);">
+            {% else %}
+            <div class="wordmark"><span class="n">N</span>OROAÇO</div>
+            <div class="tagline">FERRO E AÇO</div>
+            {% endif %}
+        </div>
+        <div class="cab-info">
+            <div class="doc-titulo">{{ titulo }}</div>
+            <div class="doc-params">
+                {% if periodo is defined and periodo %}
+                <span class="lbl">PERÍODO</span> {{ periodo }}
+                <span class="sep">|</span>
+                {% endif %}
+                <span class="lbl">GERADO EM</span> {{ data_geracao }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block conteudo %}
+{% if total_itens == 0 %}
+<p class="sem-dados">Nenhum item com comprimento excedente encontrado{% if periodo is defined and periodo %} no período {{ periodo }}{% endif %}.</p>
+{% else %}
+
+<div class="kpi-faixa">
+    <div class="kpi-card">
+        <div class="kpi-valor">{{ total_cargas }}</div>
+        <div class="kpi-label">Cargas afetadas</div>
+    </div>
+    <div class="kpi-card laranja">
+        <div class="kpi-valor">{{ total_itens }}</div>
+        <div class="kpi-label">Itens excedentes</div>
+    </div>
+    <div class="kpi-card cinza">
+        <div class="kpi-valor">{{ maior_comprimento_m }}m</div>
+        <div class="kpi-label">Maior comprimento</div>
+    </div>
+</div>
+
+{% for carga in cargas %}
+<div class="carga-bloco">
+    <div class="carga-header">
+        <div class="ch-cell carga-numero">Carga #{{ carga.nrocarga }}</div>
+        <div class="ch-cell carga-nome">{{ carga.nome_carga or '—' }}</div>
+        {% if carga.dt_saida %}
+        <div class="ch-cell carga-meta"><span class="lbl">SAÍDA</span> {{ carga.dt_saida }}</div>
+        {% endif %}
+        <div class="ch-cell ch-badge">
+            <span class="badge-contagem">{{ carga.total_itens }} {% if carga.total_itens == 1 %}item{% else %}itens{% endif %}</span>
+        </div>
+    </div>
+
+    <table class="carga-tabela">
+        <thead>
+            <tr>
+                <th style="width:8%">Pedido</th>
+                <th style="width:5%" class="col-c">Item</th>
+                <th>Produto</th>
+                <th style="width:18%">Cliente</th>
+                <th style="width:14%">Vendedor</th>
+                <th style="width:8%" class="col-c">Tipo</th>
+                <th style="width:11%" class="col-num">Comprimento</th>
+                <th style="width:9%" class="col-num">Excede em</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in carga.itens %}
+            <tr>
+                <td><span class="pedido-num">{{ item.pedido }}</span></td>
+                <td class="col-c">{{ item.item_pedido }}</td>
+                <td class="produto-cel" title="{{ item.produto }}">{{ item.produto }}</td>
+                <td>{{ item.nome_cliente or item.codigo_cliente }}</td>
+                <td>{{ item.nome_vendedor }}</td>
+                <td class="col-c">
+                    {% if item.origem_medida == 'TELHA' %}
+                    <span class="badge-tipo badge-telha">TELHA</span>
+                    {% else %}
+                    <span class="badge-tipo badge-sbx">SBX</span>
+                    {% endif %}
+                </td>
+                <td class="col-comprimento">{{ item.comprimento_m }}m</td>
+                <td class="col-excedente">+{{ item.excedente_m }}m</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endfor %}
+
+{% endif %}
+{% endblock %}

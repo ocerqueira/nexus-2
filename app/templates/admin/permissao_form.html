@@ -1,0 +1,76 @@
+{% from "admin/_macros.html" import btn_submit %}
+{# Modal: formulário de nova permissão #}
+{% set input_cls = "w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" %}
+{% set chk_cls = "h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-300" %}
+
+<div class="px-6 py-5 border-b">
+  <h3 class="font-semibold text-slate-800">Nova Permissão</h3>
+</div>
+
+<form hx-post="/admin/permissoes" hx-target="#main" hx-swap="innerHTML" class="px-6 py-5 space-y-4">
+
+  <div>
+    <label class="block text-xs font-medium text-slate-600 mb-1">Usuário<span class="text-red-400 ml-0.5">*</span></label>
+    <input type="text" list="perm-usuarios-list" name="usuario_nome_busca" placeholder="Digite o nome do usuário..."
+           class="{{ input_cls }}" autocomplete="off"
+           oninput="syncPermUsuarioId(this)">
+    <input type="hidden" name="usuario_id" id="perm-usuario-id">
+    <datalist id="perm-usuarios-list">
+      {% for u in usuarios %}
+      <option value="{{ u.nome }}" data-id="{{ u.id }}">{{ u.identificador }}</option>
+      {% endfor %}
+    </datalist>
+  </div>
+
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Tipo<span class="text-red-400 ml-0.5">*</span></label>
+      <select name="tipo_recurso" required class="{{ input_cls }}"
+              hx-get="/admin/recursos" hx-trigger="change" hx-target="#perm-recurso" hx-swap="innerHTML">
+        <option value="relatorio">Relatório</option>
+        <option value="alerta">Alerta</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Recurso<span class="text-red-400 ml-0.5">*</span></label>
+      <select name="recurso_id" required id="perm-recurso" class="{{ input_cls }}">
+        {% for r in rel_opts %}
+        <option value="{{ r.id }}">{{ r.titulo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-xs font-medium text-slate-600 mb-1">Limite diário</label>
+    <input type="number" name="limite_diario" value="10" min="1" class="{{ input_cls }}" style="max-width:120px">
+  </div>
+
+  <div>
+    <label class="block text-xs font-medium text-slate-600 mb-2">Permissões</label>
+    <div class="flex gap-5">
+      <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+        <input type="checkbox" name="pode_solicitar" value="true" checked class="{{ chk_cls }}"> Solicitar
+      </label>
+      <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+        <input type="checkbox" name="pode_agendar" value="true" class="{{ chk_cls }}"> Agendar
+      </label>
+    </div>
+  </div>
+
+  <div class="flex justify-end gap-3 pt-2 border-t">
+    <button type="button" onclick="closeModal()"
+            class="px-4 py-2 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+      Cancelar
+    </button>
+    {{ btn_submit("Conceder Permissão") }}
+  </div>
+</form>
+
+<script>
+function syncPermUsuarioId(input) {
+  const list = document.getElementById('perm-usuarios-list');
+  const opt = Array.from(list.options).find(o => o.value === input.value);
+  document.getElementById('perm-usuario-id').value = opt ? opt.dataset.id : '';
+}
+</script>

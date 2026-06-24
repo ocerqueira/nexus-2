@@ -1,0 +1,28 @@
+{
+  "titulo": "Nome do Alerta",
+  "descricao": "Descreva aqui o que este alerta detecta, quando dispara e quem notifica. Ex: detecta pedidos com valor acima do limite configurado por categoria e notifica vendedor + setores vinculados.",
+  "severidade": "alto",
+  "parametros": [
+    {
+      "nome": "cod_empresa",
+      "tipo": "integer",
+      "obrigatorio": false,
+      "padrao": 1,
+      "rotulo": "Código da empresa"
+    },
+    {
+      "nome": "data_inicio",
+      "tipo": "date",
+      "obrigatorio": false,
+      "padrao": null,
+      "rotulo": "Data de início da busca (AAAA-MM-DD). Padrão: 30 dias atrás."
+    },
+    {
+      "nome": "severidade_minima",
+      "tipo": "string",
+      "obrigatorio": false,
+      "padrao": "medio",
+      "rotulo": "Severidade mínima para filtrar: baixo | medio | alto | critico"
+    }
+  ]
+}

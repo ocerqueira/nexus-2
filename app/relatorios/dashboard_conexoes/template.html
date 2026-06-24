@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block estilos_extras %}
+<style>
+    /* Grid de gráficos lado a lado */
+    .graficos-linha {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 25px;
+        align-items: flex-start;
+    }
+    .grafico-container {
+        flex: 1;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 10px;
+    }
+    .grafico-container img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    .grafico-container .grafico-titulo {
+        text-align: center;
+        font-size: 9pt;
+        color: #6b7280;
+        margin-top: 5px;
+        font-style: italic;
+    }
+
+    /* Card de taxa */
+    .card-taxa {
+        border-left-color: #10b981 !important;
+    }
+    .card-alerta {
+        border-left-color: #f59e0b !important;
+    }
+    .card-info {
+        border-left-color: #2563eb !important;
+    }
+
+    /* Linha sem dados */
+    .sem-dados {
+        color: #9ca3af;
+        font-style: italic;
+        text-align: center;
+        padding: 30px;
+    }
+</style>
+{% endblock %}
+
+{% block conteudo %}
+
+{% if total == 0 %}
+<div class="sem-dados">
+    Nenhuma conexão encontrada com os filtros aplicados.
+</div>
+{% else %}
+
+<!-- Cards KPI -->
+<div class="cards">
+    <div class="card">
+        <div class="card-label">Total de Conexões</div>
+        <div class="card-valor">{{ total }}</div>
+    </div>
+    <div class="card card-taxa">
+        <div class="card-label">Conexões Ativas</div>
+        <div class="card-valor">{{ ativas }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Taxa de Atividade</div>
+        <div class="card-valor">{{ taxa_atividade_pct }}%</div>
+    </div>
+    <div class="card card-info">
+        <div class="card-label">Tipos de Banco</div>
+        <div class="card-valor" style="font-size: 14pt">{{ tipos_distintos }}</div>
+    </div>
+    <div class="card card-alerta">
+        <div class="card-label">Tipo Mais Comum</div>
+        <div class="card-valor" style="font-size: 12pt">{{ tipo_mais_comum | capitalize }}</div>
+    </div>
+</div>
+
+<!-- Gráficos lado a lado -->
+{% if grafico_barras or grafico_pizza %}
+<div class="graficos-linha">
+    {% if grafico_barras %}
+    <div class="grafico-container">
+        <img src="{{ grafico_barras }}" alt="Gráfico de barras: conexões por tipo e status">
+        <div class="grafico-titulo">Figura 1 — Ativas vs Inativas por tipo de banco</div>
+    </div>
+    {% endif %}
+    {% if grafico_pizza %}
+    <div class="grafico-container">
+        <img src="{{ grafico_pizza }}" alt="Gráfico de pizza: distribuição por tipo de banco">
+        <div class="grafico-titulo">Figura 2 — Distribuição percentual por tipo</div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Estatísticas por tipo -->
+{% if estatisticas_por_tipo %}
+<div class="secao">
+    <div class="secao-titulo">Resumo por Tipo de Banco</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Tipo</th>
+                <th class="texto-centro">Total</th>
+                <th class="texto-centro">Ativas</th>
+                <th class="texto-centro">Inativas</th>
+                <th class="texto-centro">% Ativas</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in estatisticas_por_tipo %}
+            <tr>
+                <td class="negrito">{{ item.tipo | capitalize }}</td>
+                <td class="texto-centro">{{ item.total }}</td>
+                <td class="texto-centro destaque negrito">{{ item.ativas }}</td>
+                <td class="texto-centro">{{ item.inativas }}</td>
+                <td class="texto-centro">
+                    {% if item.pct_ativas >= 80 %}
+                    <span class="badge badge-sucesso">{{ item.pct_ativas }}%</span>
+                    {% elif item.pct_ativas >= 50 %}
+                    <span class="badge badge-aviso">{{ item.pct_ativas }}%</span>
+                    {% else %}
+                    <span class="badge badge-erro">{{ item.pct_ativas }}%</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Tabela detalhada -->
+<div class="secao">
+    <div class="secao-titulo">Conexões Cadastradas</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Tipo</th>
+                <th>Host</th>
+                <th>Porta</th>
+                <th class="texto-centro">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for conexao in conexoes %}
+            <tr>
+                <td class="negrito">{{ conexao.nome }}</td>
+                <td>{{ conexao.tipo | capitalize }}</td>
+                <td>{{ conexao.host }}</td>
+                <td>{{ conexao.porta }}</td>
+                <td class="texto-centro">
+                    {% if conexao.ativo %}
+                    <span class="badge badge-sucesso">Ativa</span>
+                    {% else %}
+                    <span class="badge badge-erro">Inativa</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endif %}
+{% endblock %}

@@ -1,0 +1,64 @@
+{# Modal content: detalhe de uma entrada do histórico #}
+
+<div class="px-6 py-5 border-b flex items-center justify-between">
+  <div>
+    <h3 class="font-semibold text-slate-800">Detalhe da execução</h3>
+    <p class="text-xs text-slate-500 mt-0.5">{{ h.recurso_nome }} — {{ h.criado_em_fmt }}</p>
+  </div>
+  <button onclick="closeModal()"
+          class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+    </svg>
+  </button>
+</div>
+
+<div class="px-6 py-5 space-y-3 min-w-0">
+  <table class="w-full text-sm table-fixed">
+    <colgroup><col class="w-36"><col></colgroup>
+    <tbody class="divide-y divide-slate-50">
+      <tr>
+        <td class="py-2 pr-4 text-xs font-medium text-slate-500 w-36 align-top">Tipo solicitação</td>
+        <td class="py-2 text-slate-700">{{ h.tipo_solicitacao or "—" }}</td>
+      </tr>
+      <tr>
+        <td class="py-2 pr-4 text-xs font-medium text-slate-500 align-top">Usuário</td>
+        <td class="py-2 text-slate-700">{{ h.usuario_nome or "sistema" }}</td>
+      </tr>
+      {% if h.tamanho_arquivo %}
+      <tr>
+        <td class="py-2 pr-4 text-xs font-medium text-slate-500 align-top">Tamanho arquivo</td>
+        <td class="py-2 text-slate-700">{{ h.tamanho_arquivo }} bytes</td>
+      </tr>
+      {% endif %}
+      {% if h.hash_arquivo %}
+      <tr>
+        <td class="py-2 pr-4 text-xs font-medium text-slate-500 align-top">Hash arquivo</td>
+        <td class="py-2 font-mono text-xs text-slate-600 break-all">{{ h.hash_arquivo }}</td>
+      </tr>
+      {% endif %}
+      {% if h.enviado_para %}
+      <tr>
+        <td class="py-2 pr-4 text-xs font-medium text-slate-500 align-top">Enviado para</td>
+        <td class="py-2 text-slate-700 break-words">{{ h.enviado_para }}</td>
+      </tr>
+      {% endif %}
+      {% if h.parametros %}
+      <tr>
+        <td class="py-2 pr-4 text-xs font-medium text-slate-500 align-top">Parâmetros</td>
+        <td class="py-2 min-w-0 max-w-0">
+          <pre class="text-xs bg-slate-50 border border-slate-200 p-3 rounded-lg whitespace-pre-wrap break-all overflow-y-auto max-h-48 w-full">{{ h.parametros_fmt }}</pre>
+        </td>
+      </tr>
+      {% endif %}
+      {% if h.mensagem_erro %}
+      <tr>
+        <td class="py-2 pr-4 text-xs font-medium text-red-500 align-top">Erro</td>
+        <td class="py-2 min-w-0 max-w-0">
+          <pre class="text-xs bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg whitespace-pre-wrap break-all overflow-y-auto max-h-48 w-full">{{ h.mensagem_erro }}</pre>
+        </td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>

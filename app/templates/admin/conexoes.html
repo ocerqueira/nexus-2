@@ -1,0 +1,77 @@
+{% from "admin/_macros.html" import badge, badge_ativo, badge_tipo_bd, btn_acao %}
+
+{% if msg %}
+{% set tipo_cls = "bg-green-50 border-green-200 text-green-700" if msg_tipo == "ok" else "bg-red-50 border-red-200 text-red-700" %}
+<div class="mb-4 px-4 py-3 rounded-lg border text-xs {{ tipo_cls }}">{{ msg }}</div>
+{% endif %}
+
+<div class="flex items-center justify-between mb-4">
+  <h2 class="font-semibold text-slate-700">Conexões de banco de dados</h2>
+  <button class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+          hx-get="/admin/conexoes/form" hx-target="#modal-body" hx-swap="innerHTML">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Nova Conexão
+  </button>
+</div>
+
+{% if not conexoes %}
+<div class="bg-white rounded-xl border shadow-sm p-12 text-center">
+  <svg class="w-10 h-10 text-slate-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+  </svg>
+  <p class="text-slate-400">Nenhuma conexão cadastrada</p>
+  <p class="text-slate-300 text-xs mt-1">Clique em "Nova Conexão" para adicionar</p>
+</div>
+{% else %}
+<div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+  <table class="w-full">
+    <thead>
+      <tr class="text-left text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+        <th class="px-5 py-3">Tipo</th>
+        <th class="px-5 py-3">Nome</th>
+        <th class="px-5 py-3">Servidor</th>
+        <th class="px-5 py-3">Banco</th>
+        <th class="px-5 py-3">Status</th>
+        <th class="px-5 py-3">Teste</th>
+        <th class="px-5 py-3 text-right">Ações</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-50">
+      {% for cx in conexoes %}
+      <tr class="hover:bg-slate-50/50 transition-colors">
+        <td class="px-5 py-3.5">{{ badge_tipo_bd(cx.tipo) }}</td>
+        <td class="px-5 py-3.5 font-medium text-slate-800">{{ cx.nome }}</td>
+        <td class="px-5 py-3.5 text-slate-500 text-sm">{{ cx.host }}:{{ cx.porta }}</td>
+        <td class="px-5 py-3.5 text-slate-500 text-sm max-w-[200px] truncate" title="{{ cx.banco }}">{{ cx.banco }}</td>
+        <td class="px-5 py-3.5">{{ badge_ativo(cx.ativo) }}</td>
+        <td class="px-5 py-3.5">
+          <span id="status-cx-{{ cx.id }}" class="text-xs text-slate-400">—</span>
+        </td>
+        <td class="px-5 py-3.5 text-right">
+          {% if cx.ativo %}
+          <div class="flex gap-1.5 justify-end">
+            {{ btn_acao("Testar",
+                'hx-post="/admin/conexoes/' ~ cx.id ~ '/testar" hx-target="#status-cx-' ~ cx.id ~ '" hx-swap="innerHTML"',
+                "ghost") }}
+            {{ btn_acao("Cache",
+                'hx-post="/admin/conexoes/' ~ cx.id ~ '/limpar-cache" hx-target="#status-cx-' ~ cx.id ~ '" hx-swap="innerHTML"',
+                "ghost") }}
+            {{ btn_acao("Desativar",
+                'hx-delete="/admin/conexoes/' ~ cx.id ~ '" hx-target="#main" hx-swap="innerHTML" hx-confirm="Desativar conexão ' ~ cx.nome ~ '?"',
+                "danger") }}
+          </div>
+          {% else %}
+          {{ btn_acao("Reativar",
+              'hx-post="/admin/conexoes/' ~ cx.id ~ '/reativar" hx-target="#main" hx-swap="innerHTML"',
+              "success") }}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

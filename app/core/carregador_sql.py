@@ -29,7 +29,9 @@ def _parsear_arquivo_sql(caminho: Path) -> dict[str, str]:
             linhas_atuais = []
         else:
             if nome_atual is not None:
-                linhas_atuais.append(linha)
+                # Strip comment-only lines to avoid encoding issues with non-ASCII chars
+                if not linha_limpa.startswith("--"):
+                    linhas_atuais.append(linha)
 
     if nome_atual is not None:
         sql_query = "\n".join(linhas_atuais).strip()
@@ -37,7 +39,7 @@ def _parsear_arquivo_sql(caminho: Path) -> dict[str, str]:
             queries[nome_atual] = sql_query
 
     if not queries:
-        logger.warning(f"Nenhuma query com marcador '-- neme:' encontrada em {caminho}")
+        logger.warning(f"Nenhuma query com marcador '-- name:' encontrada em {caminho}")
 
     return queries
 
@@ -79,8 +81,3 @@ def carregar_query(caminho_arquivo: Path, nome_query: str) -> str:
 
     return queries[nome_query]
 
-
-def limpar_cache() -> None:
-    """Limpa o cache de queries (útil em desenvolvimento)."""
-    _cache_queries.clear()
-    logger.info("Cache de queries SQL limpo")

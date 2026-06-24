@@ -1,22 +1,14 @@
 services:
-  postgres:
-    image: postgres:18-alpine
-    container_name: nexus-postgres
+  nexus:
+    build: .
+    container_name: nexus-api
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: nexus
-      POSTGRES_USER: nexus_admin
-      POSTGRES_PASSWORD: nexus_dev_2024
     ports:
-      - "5432:5432"
+      - "8000:8000"
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - nexus_postgres_dados:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexus_admin -d nexus"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - ./logs:/app/logs
 
-volumes:
-  nexus_postgres_dados:
-    name: nexus_postgres_dados

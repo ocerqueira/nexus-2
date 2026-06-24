@@ -1,0 +1,20 @@
+{% from "admin/_macros.html" import btn_submit, campo %}
+{# Modal: importar / registrar relatório manualmente (simplificado) #}
+
+<div class="px-6 py-5 border-b">
+  <h3 class="font-semibold text-slate-800">Novo Relatório</h3>
+  <p class="text-xs text-slate-500 mt-0.5">Relatórios são registrados automaticamente via sync de filesystem.</p>
+</div>
+
+<div class="px-6 py-5">
+  <p class="text-sm text-slate-600 mb-4">
+    Para adicionar um relatório, coloque o arquivo <code class="bg-slate-100 px-1 rounded">.sql</code>
+    na pasta correspondente e clique em <strong>Sincronizar</strong> na barra lateral.
+  </p>
+  <div class="flex justify-end">
+    <button type="button" onclick="closeModal()"
+            class="px-4 py-2 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+      Fechar
+    </button>
+  </div>
+</div>

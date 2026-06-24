@@ -331,9 +331,7 @@ COMMENT ON COLUMN historico.enviado_para IS 'JSON com canais: {"whatsapp": "5521
 -- Relatórios/alertas que rodam automaticamente em horários definidos.
 -- Suporta: 1+ horários por dia + filtro de dias úteis.
 -- =============================================================================
-DROP TABLE IF EXISTS agendamentos CASCADE;
-
-CREATE TABLE agendamentos (
+CREATE TABLE IF NOT EXISTS agendamentos (
     id                  SERIAL PRIMARY KEY,
     usuario_id          INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     tipo_recurso        VARCHAR(20) NOT NULL,

@@ -1,0 +1,35 @@
+{% from "admin/_macros.html" import badge, badge_ativo %}
+{# Partial: <tr> edit mode. Var: u (dict) #}
+{% set inp = 'class="w-full px-2 py-1.5 text-xs border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-indigo-50"' %}
+<tr id="row-u{{ u.id }}" class="bg-indigo-50/30">
+  <td class="px-5 py-3 font-medium text-slate-800">{{ u.nome }}</td>
+  <td class="px-5 py-3 text-xs text-slate-500 font-mono">{{ u.identificador }}</td>
+  <td class="px-5 py-3">{{ badge(u.origem, "blue") }}</td>
+  <td class="px-5 py-3">
+    <input type="text" name="whatsapp_numero" value="{{ u.whatsapp_numero or '' }}"
+           placeholder="5517981006771" form="fedit{{ u.id }}" {{ inp | safe }}>
+  </td>
+  <td class="px-5 py-3">
+    <input type="email" name="email" value="{{ u.email or '' }}"
+           placeholder="joao@empresa.com" form="fedit{{ u.id }}" {{ inp | safe }}>
+  </td>
+  <td class="px-5 py-3 text-slate-500 text-sm">{{ u.departamento or "—" }}</td>
+  <td class="px-5 py-3">{{ badge_ativo(u.ativo) }}</td>
+  <td class="px-5 py-3 text-right whitespace-nowrap">
+    <form id="fedit{{ u.id }}"
+          hx-post="/admin/usuarios/{{ u.id }}/salvar"
+          hx-target="#row-u{{ u.id }}" hx-swap="outerHTML"
+          class="inline-flex gap-1.5">
+      <button type="submit"
+              class="px-3 py-1.5 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+        Salvar
+      </button>
+      <button type="button"
+              class="px-3 py-1.5 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+              hx-get="/admin/usuarios/{{ u.id }}/linha"
+              hx-target="#row-u{{ u.id }}" hx-swap="outerHTML">
+        Cancelar
+      </button>
+    </form>
+  </td>
+</tr>

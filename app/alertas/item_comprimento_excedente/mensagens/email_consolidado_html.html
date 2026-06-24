@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5; }
+    .header { background: #ef4444; color: white; padding: 20px; border-radius: 4px; }
+    .header h1 { margin: 0; font-size: 20px; }
+    .header .meta { font-size: 12px; opacity: 0.9; margin-top: 5px; }
+    .cards { display: flex; gap: 10px; margin: 20px 0; }
+    .card { flex: 1; background: #f3f4f6; border-left: 4px solid #ef4444; padding: 12px; border-radius: 4px; }
+    .card-label { color: #6b7280; font-size: 10px; text-transform: uppercase; }
+    .card-valor { font-size: 18px; font-weight: 700; margin-top: 3px; }
+    .resumo { background: #fee2e2; padding: 12px 15px; border-left: 4px solid #ef4444; margin: 20px 0; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 9pt; }
+    th { background: #1f2937; color: white; padding: 8px 10px; text-align: left; }
+    td { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; }
+    tr:nth-child(even) { background: #f9fafb; }
+    .alerta-critico { color: #ef4444; font-weight: bold; }
+    .setores { background: #fef3c7; padding: 12px; border-radius: 4px; margin-top: 20px; }
+    .setores h2 { margin: 0 0 8px 0; font-size: 14px; }
+    .footer { color: #9ca3af; font-size: 11px; margin-top: 25px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🚨 {{ titulo }}</h1>
+    <div class="meta">Severidade: {{ severidade | upper }} • {{ data_geracao }}</div>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Itens Detectados</div>
+      <div class="card-valor">{{ total }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Pedidos Afetados</div>
+      <div class="card-valor">{{ estatisticas.pedidos_afetados }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Maior Comprimento</div>
+      <div class="card-valor">{{ "%.2f"|format(estatisticas.maior_comprimento_m) }}m</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Vendedores</div>
+      <div class="card-valor">{{ estatisticas.vendedores_afetados }}</div>
+    </div>
+  </div>
+
+  <div class="resumo">
+    <strong>{{ resumo }}</strong>
+  </div>
+
+  {% if dados %}
+  <table>
+    <thead>
+      <tr>
+        <th>Pedido</th>
+        <th>Cliente</th>
+        <th>Produto</th>
+        <th>Comprimento</th>
+        <th>Origem</th>
+        <th>Vendedor</th>
+        <th>Carga</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in dados %}
+      <tr>
+        <td><strong>{{ item.pedido }}</strong></td>
+        <td>{{ item.nome_cliente }}</td>
+        <td>{{ item.produto }}</td>
+        <td class="alerta-critico">{{ "%.2f"|format(item.comprimento_m) }}m</td>
+        <td>{{ item.origem_medida }}</td>
+        <td>{{ item.nome_vendedor }}<br><small>📞 {{ item.telefone_vendedor or 'N/D' }}</small></td>
+        <td>{{ item.nrocarga }}<br><small>{{ item.data }}</small></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if contatos_setores %}
+  <div class="setores">
+    <h2>👥 Setores Notificados</h2>
+    <table>
+      <thead>
+        <tr><th>Setor</th><th>Nome</th><th>Email</th><th>WhatsApp</th><th>Origem</th></tr>
+      </thead>
+      <tbody>
+        {% for c in contatos_setores %}
+        <tr>
+          <td><strong>{{ c.setor }}</strong></td>
+          <td>{{ c.nome }}</td>
+          <td>{{ c.email or '—' }}</td>
+          <td>{{ c.whatsapp or '—' }}</td>
+          <td>{{ c.origem_medida }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="footer">
+    Notificação gerada pelo Nexus em {{ data_geracao }}
+  </div>
+</body>
+</html>

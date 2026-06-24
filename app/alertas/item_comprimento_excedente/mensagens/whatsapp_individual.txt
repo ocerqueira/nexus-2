@@ -1,0 +1,11 @@
+⚠️ *ALERTA DE COMPRIMENTO*
+
+A carga *N {{ nrocarga }}* contém um item com comprimento superior a *7,5m*.
+
+*Vendedor:* *{{ nome_vendedor }}*
+
+*INFORMAÇÕES DO ITEM*
+*Pedido:* {{ pedido }}
+*Comprimento:* {{ "%.2f"|format(comprimento_m)|replace('.', ',') }} m
+
+⚠️ *Confira se o transporte está adequado para este comprimento.*

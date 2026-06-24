@@ -120,13 +120,16 @@ class GerenciadorConexoes:
 
         logger.info(f"Criando engine para conexão '{nome}' (tipo: {dados['tipo']})")
 
-        novo_engine = create_engine(
-            url,
-            pool_pre_ping=True,
-            pool_size=3,
-            max_overflow=5,
-            pool_recycle=3600,  # Recicla conexão após 1 hora
-        )
+        kwargs: dict = {
+            "pool_pre_ping": True,
+            "pool_size": 3,
+            "max_overflow": 5,
+            "pool_recycle": 3600,
+        }
+        if dados["tipo"] == "firebird":
+            kwargs["connect_args"] = {"charset": "WIN1252"}
+
+        novo_engine = create_engine(url, **kwargs)
 
         self._cache_engines[nome] = novo_engine
         return novo_engine
@@ -160,13 +163,20 @@ class GerenciadorConexoes:
 
     def testar_conexao(self, nome: str) -> dict[str, Any]:
         """
-        Testa se uma conexão funciona executando SELECT 1.
+        Testa se uma conexão funciona executando health-check por tipo de banco.
 
         Returns:
             {"status": "ok"} ou {"status": "erro", "mensagem": "..."}
         """
+        _HEALTH_CHECK = {
+            "firebird": "SELECT 1 FROM RDB$DATABASE",
+            "postgres": "SELECT 1",
+            "mysql": "SELECT 1",
+        }
         try:
-            self.executar(conexao=nome, query="SELECT 1 AS teste")
+            dados = self._buscar_dados_conexao(nome)
+            query = _HEALTH_CHECK.get(dados["tipo"], "SELECT 1")
+            self.executar(conexao=nome, query=query)
             return {"status": "ok", "mensagem": "Conexão validada com sucesso"}
         except Exception as erro:
             return {"status": "erro", "mensagem": str(erro)}

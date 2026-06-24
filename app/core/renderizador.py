@@ -1,6 +1,6 @@
+import base64
 import logging
 from datetime import datetime
-from multiprocessing import context
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -10,6 +10,17 @@ logger = logging.getLogger(__name__)
 
 # Pasta dos templates compartilhados (base.html, etc)
 PASTA_TEMPLATES_BASE = Path(__file__).parent / "templates"
+
+_LOGO_PATH = PASTA_TEMPLATES_BASE / "logo.png"
+
+
+def _carregar_logo() -> str | None:
+    if not _LOGO_PATH.exists():
+        return None
+    ext = _LOGO_PATH.suffix.lstrip(".").lower()
+    mime = "svg+xml" if ext == "svg" else ext
+    dados = _LOGO_PATH.read_bytes()
+    return f"data:image/{mime};base64,{base64.b64encode(dados).decode()}"
 
 # Pasta dos relatórios (cada relatório tem seu template.html)
 PASTA_RELATORIOS = Path(__file__).parent.parent / "relatorios"
@@ -61,6 +72,7 @@ def renderizar_html(
         "titulo": titulo,
         "subtitulo": subtitulo,
         "data_geracao": datetime.now().strftime("%d/%m/%Y às %H:%M"),
+        "logo_b64": _carregar_logo(),
     }
 
     html_renderizado = template.render(**contexto)
@@ -88,7 +100,7 @@ def gerar_pdf(
     """
     html = renderizar_html(nome_relatorio, dados, titulo, subtitulo)
 
-    pdf_bytes = HTML(string=html).write_pdf()
+    pdf_bytes = HTML(string=html, base_url=str(PASTA_TEMPLATES_BASE)).write_pdf()
     logger.info(f"PDF gerado para '{nome_relatorio}' ({len(pdf_bytes)} bytes)")
 
     return pdf_bytes

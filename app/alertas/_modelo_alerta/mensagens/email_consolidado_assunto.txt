@@ -1,0 +1,1 @@
+[{{ severidade | upper }}] {{ titulo }} — {{ total }} ocorrência(s) em {{ estatisticas.pedidos_unicos }} pedido(s)

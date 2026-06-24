@@ -1,0 +1,21 @@
+{
+  "titulo": "Item com Comprimento Excedente",
+  "descricao": "Detecta itens de telha e SBX com comprimento acima do limite nos pedidos dos últimos 30 dias. Notifica vendedor, assistente e setores vinculados (Expedição, Qualidade, Logística, Diretoria).",
+  "severidade": "critico",
+  "parametros": [
+    {
+      "nome": "cod_empresa",
+      "tipo": "integer",
+      "obrigatorio": false,
+      "padrao": 1,
+      "rotulo": "Código da empresa (1 = Cerâmica Principal)"
+    },
+    {
+      "nome": "data_inicio",
+      "tipo": "date",
+      "obrigatorio": false,
+      "padrao": null,
+      "rotulo": "Data de início da busca (AAAA-MM-DD). Padrão: 30 dias atrás."
+    }
+  ]
+}

@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body      { font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5; }
+    .header   { background: #ef4444; color: white; padding: 20px; border-radius: 4px; }
+    .header h1 { margin: 0; font-size: 20px; }
+    .header .meta { font-size: 12px; opacity: 0.9; margin-top: 5px; }
+
+    /* Severidade: troque a cor do header conforme necessário
+       critico → #ef4444 (vermelho)
+       alto    → #f97316 (laranja)
+       medio   → #f59e0b (amarelo)
+       baixo   → #10b981 (verde) */
+
+    .cards       { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; }
+    .card        { flex: 1; min-width: 120px; background: #f3f4f6; border-left: 4px solid #ef4444; padding: 12px; border-radius: 4px; }
+    .card-label  { color: #6b7280; font-size: 10px; text-transform: uppercase; }
+    .card-valor  { font-size: 18px; font-weight: 700; margin-top: 3px; }
+
+    .resumo { background: #fee2e2; padding: 12px 15px; border-left: 4px solid #ef4444; margin: 20px 0; font-size: 14px; }
+
+    table  { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 9pt; }
+    th     { background: #1f2937; color: white; padding: 8px 10px; text-align: left; }
+    td     { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; }
+    tr:nth-child(even) { background: #f9fafb; }
+
+    .badge-critico  { color: #ef4444; font-weight: bold; }
+    .badge-alto     { color: #f97316; font-weight: bold; }
+    .badge-medio    { color: #f59e0b; font-weight: bold; }
+    .badge-baixo    { color: #10b981; font-weight: bold; }
+
+    .secao        { margin-top: 25px; }
+    .secao-titulo { background: #f3f4f6; padding: 8px 12px; font-weight: 600; border-left: 4px solid #ef4444; margin-bottom: 10px; }
+
+    .footer { color: #9ca3af; font-size: 11px; margin-top: 25px; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>🚨 {{ titulo }}</h1>
+    <div class="meta">Severidade: {{ severidade | upper }} &bull; {{ data_geracao }}</div>
+  </div>
+
+  <!-- KPI Cards: adapte os campos conforme estatisticas do processador -->
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Ocorrências</div>
+      <div class="card-valor">{{ total }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Pedidos</div>
+      <div class="card-valor">{{ estatisticas.pedidos_unicos }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Categorias</div>
+      <div class="card-valor">{{ estatisticas.categorias_unicas }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Valor Total</div>
+      <div class="card-valor">R$ {{ "{:,.0f}".format(estatisticas.valor_total) }}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Maior Valor</div>
+      <div class="card-valor">R$ {{ "{:,.2f}".format(estatisticas.valor_max) }}</div>
+    </div>
+  </div>
+
+  <div class="resumo">
+    <strong>{{ resumo }}</strong>
+  </div>
+
+  <!-- Tabela detalhada: adapte as colunas conforme os campos retornados pelo processador -->
+  {% if dados %}
+  <div class="secao">
+    <div class="secao-titulo">Ocorrências Detalhadas</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Pedido</th>
+          <th>Data</th>
+          <th>Cliente</th>
+          <th>Produto</th>
+          <th>Qtd</th>
+          <th>Valor</th>
+          <th>Excedente</th>
+          <th>Vendedor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in dados %}
+        <tr>
+          <td><strong>{{ item.pedido }}</strong></td>
+          <td>{{ item.data }}</td>
+          <td>{{ item.nome_cliente }}</td>
+          <td>{{ item.produto }}<br><small>{{ item.cod_produto }}</small></td>
+          <td class="texto-centro">{{ item.quantidade }}</td>
+          <td class="badge-alto">R$ {{ "{:,.2f}".format(item.valor) }}</td>
+          <td class="badge-critico">
+            {% if item.excedente > 0 %}+R$ {{ "{:,.2f}".format(item.excedente) }} ({{ item.pct_excedente }}%){% else %}—{% endif %}
+          </td>
+          <td>{{ item.nome_vendedor }}<br><small>📞 {{ item.telefone_vendedor or 'N/D' }}</small></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Agrupamento por categoria: útil quando há muitas ocorrências -->
+  {% if estatisticas_por_grupo %}
+  <div class="secao">
+    <div class="secao-titulo">Resumo por Categoria</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Categoria</th>
+          <th>Ocorrências</th>
+          <th>Valor Total</th>
+          <th>Valor Médio</th>
+          <th>Maior Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in estatisticas_por_grupo %}
+        <tr>
+          <td><strong>{{ g.cod_categoria }}</strong></td>
+          <td>{{ g.total }}</td>
+          <td>R$ {{ "{:,.2f}".format(g.valor_total) }}</td>
+          <td>R$ {{ "{:,.2f}".format(g.valor_medio) }}</td>
+          <td>R$ {{ "{:,.2f}".format(g.valor_max) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Contatos notificados -->
+  {% if contatos_notificacao %}
+  <div class="secao" style="background: #fef3c7; padding: 12px; border-radius: 4px;">
+    <div class="secao-titulo" style="border-color: #f59e0b;">👥 Setores Notificados</div>
+    <table>
+      <thead>
+        <tr><th>Setor</th><th>Nome</th><th>Email</th><th>WhatsApp</th></tr>
+      </thead>
+      <tbody>
+        {% for c in contatos_notificacao %}
+        <tr>
+          <td><strong>{{ c.setor }}</strong></td>
+          <td>{{ c.nome }}</td>
+          <td>{{ c.email or '—' }}</td>
+          <td>{{ c.whatsapp or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="footer">
+    Notificação gerada pelo Nexus em {{ data_geracao }}
+  </div>
+
+</body>
+</html>

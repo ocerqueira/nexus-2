@@ -1,0 +1,131 @@
+{% from "admin/_macros.html" import badge, card, btn_acao %}
+
+{% if msg %}
+{% set tipo_cls = "bg-green-50 border-green-200 text-green-700" if msg_tipo == "ok" else "bg-red-50 border-red-200 text-red-700" %}
+<div class="mb-4 px-4 py-3 rounded-lg border text-xs {{ tipo_cls }}">{{ msg }}</div>
+{% endif %}
+
+{# ── Toolbar ──────────────────────────────────────────── #}
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <div class="relative flex-1 min-w-48">
+    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    </svg>
+    <input type="text" name="busca" value="{{ busca }}" placeholder="Buscar relatório..."
+           class="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+           hx-get="/admin/relatorios" hx-trigger="keyup changed delay:400ms"
+           hx-target="#main" hx-swap="innerHTML" hx-include="[name='status_filtro']">
+  </div>
+
+  <div class="flex gap-1.5 items-center">
+    <span class="text-xs text-slate-500">Status:</span>
+    {% for val, label in [("", "Todos"), ("ativo", "Ativo"), ("inativo", "Inativo")] %}
+    <button type="button"
+            class="px-3 py-1.5 text-xs rounded-full border transition-colors
+                   {{ 'bg-indigo-600 text-white border-indigo-600' if status_filtro == val else 'bg-white text-slate-600 border-slate-300 hover:border-indigo-300' }}"
+            hx-get="/admin/relatorios?status_filtro={{ val }}&busca={{ busca }}"
+            hx-target="#main" hx-swap="innerHTML">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  <input type="hidden" name="status_filtro" value="{{ status_filtro }}">
+
+  <button class="ml-auto inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+          hx-get="/admin/relatorios/form" hx-target="#modal-body" hx-swap="innerHTML">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Novo Relatório
+  </button>
+</div>
+
+{# ── Tabela por categoria ─────────────────────────────── #}
+{% set cor_st = {"ativo": "green", "inativo": "gray", "removido": "red"} %}
+
+{% if not relatorios %}
+<div class="bg-white rounded-xl border shadow-sm p-12 text-center">
+  <svg class="w-10 h-10 text-slate-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+  </svg>
+  <p class="text-slate-400">Nenhum relatório encontrado</p>
+  <p class="text-slate-300 text-xs mt-1">Use ↺ Sync FS para detectar relatórios do filesystem</p>
+</div>
+{% else %}
+
+{% set categorias = relatorios | map(attribute='categoria') | unique | list %}
+{% set sem_cat = relatorios | selectattr('categoria', 'none') | list %}
+{% set com_cat = relatorios | rejectattr('categoria', 'none') | list %}
+
+{# Group by category #}
+{% set grupos = {} %}
+{% for r in com_cat %}
+  {% if r.categoria not in grupos %}{% set _ = grupos.update({r.categoria: []}) %}{% endif %}
+  {% set _ = grupos[r.categoria].append(r) %}
+{% endfor %}
+{% if sem_cat %}{% set _ = grupos.update({"Sem categoria": sem_cat}) %}{% endif %}
+
+{% for cat, itens in grupos.items() %}
+{% set grupo_id = "rel-grupo-" ~ loop.index %}
+<div class="bg-white rounded-xl border shadow-sm mb-3 overflow-hidden">
+
+  {# Cabeçalho da categoria — clicável para colapsar #}
+  <button class="w-full flex items-center gap-2 px-5 py-3 bg-slate-50 border-b text-left"
+          onclick="toggleGrupo('{{ grupo_id }}', this)">
+    {% if cat != "Sem categoria" %}
+    {{ badge(cat, "blue") }}
+    {% else %}
+    <span class="text-xs text-slate-400 italic">Sem categoria</span>
+    {% endif %}
+    <span class="text-xs text-slate-400">{{ itens | length }} relatório(s)</span>
+    <svg class="grupo-chevron w-4 h-4 text-slate-400 ml-auto transition-transform duration-150"
+         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </button>
+
+  <div id="{{ grupo_id }}">
+    <table class="w-full">
+      <thead>
+        <tr class="text-left text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+          <th class="px-5 py-2.5">Título</th>
+          <th class="px-5 py-2.5">Nome técnico</th>
+          <th class="px-5 py-2.5">Status</th>
+          <th class="px-5 py-2.5">Último sync</th>
+          <th class="px-5 py-2.5 text-right">Ações</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-50">
+        {% for r in itens %}
+        {% set zebra = "bg-white" if loop.index is odd else "bg-slate-50" %}
+        <tr class="{{ zebra }} hover:bg-indigo-50/30 transition-colors">
+          <td class="px-5 py-3"><span class="font-medium text-slate-800">{{ r.titulo }}</span></td>
+          <td class="px-5 py-3 text-xs font-mono text-slate-400">{{ r.nome }}</td>
+          <td class="px-5 py-3">{{ badge(r.status, cor_st.get(r.status, "gray")) }}</td>
+          <td class="px-5 py-3 text-xs text-slate-400">{{ r.ultimo_sync_fmt }}</td>
+          <td class="px-5 py-3 text-right">
+            {% if r.status == "ativo" %}
+            {{ btn_acao("Testar",
+                'hx-post="/admin/relatorios/' ~ r.id ~ '/disparar" hx-swap="outerHTML"',
+                "ghost") }}
+            {{ btn_acao("Inativar",
+                'hx-post="/admin/relatorios/' ~ r.id ~ '/inativar" hx-target="#main" hx-swap="innerHTML" hx-confirm="Inativar ' ~ r.nome ~ '?"',
+                "danger") }}
+            {% elif r.status == "inativo" %}
+            {{ btn_acao("Ativar",
+                'hx-post="/admin/relatorios/' ~ r.id ~ '/ativar" hx-target="#main" hx-swap="innerHTML"',
+                "success") }}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endfor %}
+
+{% endif %}
+
+<p class="text-xs text-slate-400 mt-2">Total: {{ relatorios | length }} relatório(s). Use <strong>Sync FS</strong> para detectar novos.</p>

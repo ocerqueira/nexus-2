@@ -28,7 +28,8 @@ def garantir_estrutura_banco() -> None:
         logger.warning(f"Pasta {PASTA_BANCO} não existe")
         return
 
-    arquivos = sorted(PASTA_BANCO.glob("*.sql"))
+    # Arquivos de estrutura numerados (001_*.sql, 002_*.sql, ...), em ordem
+    arquivos = sorted(PASTA_BANCO.glob("[0-9][0-9][0-9]_*.sql"))
 
     if not arquivos:
         logger.warning("Nenhum arquivo SQL encontrado em banco/")

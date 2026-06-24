@@ -7,6 +7,7 @@ Esta é a peça central que torna o sistema agnóstico:
 - N8N consome o payload de saída sem precisar saber lógica de cada alerta.
 """
 
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -14,13 +15,23 @@ from typing import Any
 from sqlalchemy import text
 
 from app.bd import engine
-from app.core.renderizador_mensagens import (
-    detectar_capacidades_alerta,
-    renderizar_mensagens_consolidadas,
-    renderizar_mensagens_individuais,
-)
+from app.core.renderizador_mensagens import renderizar_mensagens_individuais
 
 logger = logging.getLogger(__name__)
+
+
+def _get_modo_teste() -> tuple[bool, str | None, str | None]:
+    """Retorna (ativo, test_email, test_whatsapp). Seguro: retorna False em qualquer erro."""
+    try:
+        with engine.connect() as c:
+            rows = c.execute(text(
+                "SELECT chave, valor FROM configuracoes "
+                "WHERE chave IN ('modo_teste', 'test_email', 'test_whatsapp')"
+            )).mappings().all()
+        cfg = {r["chave"]: r["valor"] for r in rows}
+        return cfg.get("modo_teste") == "true", cfg.get("test_email"), cfg.get("test_whatsapp")
+    except Exception:
+        return False, None, None
 
 
 class AlertaNaoEncontrado(Exception):
@@ -120,22 +131,18 @@ def _verificar_cooldown(condicoes: list[dict], forcar: bool = False) -> dict:
 def _buscar_destinatarios_fixos(condicoes: list[dict]) -> list[dict]:
     """
     Resolve os destinatários fixos (do banco) buscando dados de contato.
-
-    Args:
-        condicoes: Lista de condições do alerta com campo 'destinatarios' (JSONB)
-
-    Returns:
-        Lista de dicts com nome, whatsapp, email dos destinatários.
+    Preserva o canal por condição e dedup por whatsapp.
     """
-    # Extrair todos os usuario_ids únicos das condições
-    usuario_ids = set()
+    # Mapeia usuario_id → set de canais (um usuário pode aparecer em múltiplas condições)
+    usuario_canais: dict[int, set] = {}
     for condicao in condicoes:
-        destinatarios = condicao.get("destinatarios") or []
-        for dest in destinatarios:
-            if "usuario_id" in dest:
-                usuario_ids.add(dest["usuario_id"])
+        canais = set(condicao.get("canais") or [])
+        for dest in condicao.get("destinatarios") or []:
+            uid = dest.get("usuario_id")
+            if uid:
+                usuario_canais.setdefault(uid, set()).update(canais)
 
-    if not usuario_ids:
+    if not usuario_canais:
         return []
 
     with engine.connect() as conexao:
@@ -146,21 +153,46 @@ def _buscar_destinatarios_fixos(condicoes: list[dict]) -> list[dict]:
                 FROM usuarios
                 WHERE id = ANY(:ids) AND ativo = TRUE
             """),
-                {"ids": list(usuario_ids)},
+                {"ids": list(usuario_canais.keys())},
             )
             .mappings()
             .all()
         )
 
-    return [
-        {
+    vistos: set[str] = set()
+    destinatarios = []
+    for linha in resultado:
+        whatsapp = linha["whatsapp_numero"]
+        chave = whatsapp or str(linha["id"])
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        canais_usuario = sorted(usuario_canais.get(linha["id"], []))
+        destinatarios.append({
             "id": linha["id"],
             "nome": linha["nome"],
             "email": linha["email"],
-            "whatsapp": linha["whatsapp_numero"],
-        }
-        for linha in resultado
-    ]
+            "whatsapp": whatsapp,
+            "canais": canais_usuario,
+        })
+    return destinatarios
+
+
+def _buscar_ultimo_hash(recurso_nome: str) -> str | None:
+    """Retorna hash_arquivo do último disparo bem-sucedido deste alerta."""
+    with engine.connect() as conexao:
+        return conexao.execute(
+            text("""
+                SELECT hash_arquivo FROM historico
+                WHERE recurso_nome = :nome
+                  AND tipo_recurso = 'alerta'
+                  AND status = 'sucesso'
+                  AND hash_arquivo IS NOT NULL
+                ORDER BY criado_em DESC
+                LIMIT 1
+            """),
+            {"nome": recurso_nome},
+        ).scalar()
 
 
 def _consolidar_canais(condicoes: list[dict]) -> list[str]:
@@ -206,23 +238,24 @@ def _registrar_historico(
                 INSERT INTO historico (
                     tipo_recurso, recurso_id, recurso_nome,
                     tipo_solicitacao, status,
-                    enviado_para, parametros
+                    enviado_para, parametros, hash_arquivo
                 ) VALUES (
                     'alerta', :recurso_id, :recurso_nome,
                     'alerta_automatico', 'sucesso',
-                    :enviado_para, :parametros
+                    :enviado_para, :parametros, :hash_arquivo
                 )
             """),
             {
                 "recurso_id": alerta["id"],
                 "recurso_nome": alerta["nome"],
-                "enviado_para": {
+                "enviado_para": json.dumps({
                     "canais": canais,
                     "destinatarios": [d["nome"] for d in destinatarios],
-                },
-                "parametros": {
+                }, ensure_ascii=False),
+                "parametros": json.dumps({
                     "total_encontrado": resultado_processador.get("total", 0),
-                },
+                }),
+                "hash_arquivo": resultado_processador.get("fingerprint"),
             },
         )
 
@@ -300,11 +333,28 @@ def orquestrar_alerta(
             "resumo": resultado_processador.get("resumo", ""),
         }
 
-    # 6. Detectar capacidades (que mensagens o alerta sabe renderizar)
-    capacidades = detectar_capacidades_alerta(nome_alerta)
+    # 6. Deduplicação por fingerprint
+    fingerprint = resultado_processador.get("fingerprint")
+    if fingerprint and not forcar:
+        ultimo_hash = _buscar_ultimo_hash(nome_alerta)
+        if ultimo_hash == fingerprint:
+            logger.info(f"Alerta '{nome_alerta}' sem mudança de dados (hash={fingerprint[:8]}…)")
+            return {
+                "alerta": {
+                    "id": alerta["id"],
+                    "nome": alerta["nome"],
+                    "titulo": alerta["titulo"],
+                    "severidade": alerta["severidade"],
+                },
+                "deve_notificar": False,
+                "motivo": "dados_sem_alteracao",
+                "fingerprint": fingerprint,
+                "resumo": resultado_processador.get("resumo", ""),
+            }
 
     # 7. Montar contexto para os templates
     contexto = {
+        **resultado_processador,
         "titulo": alerta["titulo"],
         "severidade": alerta["severidade"],
         "descricao": alerta["descricao"],
@@ -313,31 +363,52 @@ def orquestrar_alerta(
         "resumo": resultado_processador.get("resumo", ""),
     }
 
-    # 8. Renderizar mensagens consolidadas
-    mensagens_consolidadas = {}
-    if capacidades["tem_consolidado"]:
-        mensagens_consolidadas = renderizar_mensagens_consolidadas(
-            nome_alerta, contexto
-        )
-
-    # 9. Renderizar mensagens individuais (uma por linha)
+    # 8. Renderizar mensagens individuais (uma por linha de dado)
     grupos_individuais = []
-    if capacidades["tem_individual"]:
-        for linha in resultado_processador.get("dados", []):
-            mensagens = renderizar_mensagens_individuais(nome_alerta, contexto, linha)
-            if mensagens:
-                grupos_individuais.append(
-                    {
-                        "dados_linha": linha,
-                        "mensagens": mensagens,
-                    }
-                )
+    for linha in resultado_processador.get("dados", []):
+        mensagens = renderizar_mensagens_individuais(nome_alerta, contexto, linha)
+        if mensagens:
+            grupos_individuais.append({"dados_linha": linha, "mensagens": mensagens})
 
     # 10. Buscar destinatários fixos do banco
     destinatarios = _buscar_destinatarios_fixos(alerta["condicoes"])
 
+    # 10b. Mesclar contatos de setores retornados pelo processador
+    contatos_setores = resultado_processador.get("contatos_setores") or []
+    if contatos_setores:
+        whatsapps_existentes = {d["whatsapp"] for d in destinatarios if d.get("whatsapp")}
+        for contato in contatos_setores:
+            whatsapp = contato.get("whatsapp")
+            if whatsapp and whatsapp in whatsapps_existentes:
+                continue
+            destinatarios.append({
+                "id": None,
+                "nome": contato.get("nome", ""),
+                "setor": contato.get("setor"),
+                "origem_medida": contato.get("origem_medida"),
+                "email": contato.get("email"),
+                "whatsapp": whatsapp,
+            })
+            if whatsapp:
+                whatsapps_existentes.add(whatsapp)
+
     # 11. Consolidar canais usados
     canais = _consolidar_canais(alerta["condicoes"])
+
+    # 10c. Modo Teste — substituir destinatários pelo contato de teste
+    _modo_teste, _test_email, _test_whatsapp = _get_modo_teste()
+    if _modo_teste:
+        logger.warning(
+            f"[MODO TESTE] Alerta '{nome_alerta}': substituindo {len(destinatarios)} "
+            f"destinatário(s) pelo contato de teste"
+        )
+        destinatarios = [{
+            "id": None,
+            "nome": "[TESTE]",
+            "email": _test_email or None,
+            "whatsapp": _test_whatsapp or None,
+            "canais": canais,
+        }]
 
     # 12. Atualizar ultimo_disparo (sem aguardar resposta - efeito colateral)
     _atualizar_ultimo_disparo(alerta["condicoes"])
@@ -358,7 +429,6 @@ def orquestrar_alerta(
         "total_encontrado": resultado_processador.get("total", 0),
         "canais": canais,
         "destinatarios": destinatarios,
-        "mensagens_consolidadas": mensagens_consolidadas,
         "grupos_individuais": grupos_individuais,
         "dados": resultado_processador.get("dados", []),
     }

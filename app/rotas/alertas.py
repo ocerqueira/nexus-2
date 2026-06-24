@@ -4,10 +4,11 @@ Rotas de verificação de alertas.
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 
 from app.alertas.conexoes_inativas.processador import ProcessadorConexoesInativas
+from app.alertas.item_comprimento_excedente.processador import ProcessadorItemComprimentoExcedente
 from app.core.orquestrador_alertas import AlertaNaoEncontrado, orquestrar_alerta
 
 logger = logging.getLogger(__name__)
@@ -27,17 +28,22 @@ class RequisicaoAlerta(BaseModel):
 # Mapeamento nome → classe do processador
 PROCESSADORES = {
     "conexoes_inativas": ProcessadorConexoesInativas,
+    "item_comprimento_excedente": ProcessadorItemComprimentoExcedente,
 }
 
 
 @router.post("/{nome_alerta}/verificar")
 def verificar_alerta(
-    nome_alerta: str,
+    nome_alerta: str = Path(description="Nome técnico do alerta (ex: 'conexoes_inativas', 'item_comprimento_excedente')"),
     requisicao: RequisicaoAlerta | None = None,
-    forcar: bool = Query(False, description="Ignora cooldown se True"),
+    forcar: bool = Query(False, description="Se True, ignora cooldown e deduplicação por fingerprint"),
 ) -> dict:
     """
     Verifica um alerta e retorna payload completo para notificação.
+
+    O payload inclui destinatários resolvidos, mensagens renderizadas
+    (consolidadas e individuais) e metadados para o N8N decidir se deve notificar.
+    Quando `forcar=true`, ignora cooldown e deduplicação — útil para testes manuais.
     """
     # 1. Validar que o processador existe
     if nome_alerta not in PROCESSADORES:

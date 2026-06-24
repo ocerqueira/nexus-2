@@ -1,0 +1,33 @@
+⚠️ *{{ titulo }}*
+🚨 Severidade: {{ severidade | upper }}
+
+{% if total == 1 %}
+*1 item* com comprimento excedente detectado nos últimos 30 dias:
+{% else %}
+*{{ total }} itens* com comprimento excedente detectados nos últimos 30 dias:
+{% endif %}
+
+{% for item in dados %}
+┌─ *Pedido {{ item.pedido }}* — {{ item.nome_cliente }}
+│   Produto: {{ item.produto }} ({{ item.cod_produto }})
+│   Comprimento: *{{ "%.2f"|format(item.comprimento_m) }}m*
+│   Origem: {{ item.origem_medida }}
+│   Vendedor: {{ item.nome_vendedor }}
+│   📞 {{ item.telefone_vendedor or 'N/D' }}
+└─ Carga {{ item.nrocarga }} — {{ item.data }}
+
+{% endfor %}
+
+📊 *Resumo:*
+• Origens afetadas: {{ estatisticas.origens_afetadas }}
+• Vendedores afetados: {{ estatisticas.vendedores_afetados }}
+• Maior comprimento: {{ "%.2f"|format(estatisticas.maior_comprimento_m) }}m
+
+{% if contatos_setores %}
+👥 *Setores notificados:*
+{% for c in contatos_setores %}
+  {{ c.setor }} — {{ c.nome }} 📞 {{ c.whatsapp or 'N/D' }}
+{% endfor %}
+{% endif %}
+
+_Gerado pelo Nexus em {{ data_geracao }}_
