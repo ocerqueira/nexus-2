@@ -64,8 +64,15 @@
 
     .rodape { display: none; }
 
-    /* ── N badge — usado no cabeçalho de carga e no rodapé ─────────── */
+    /* ── N badge — imagem ou fallback CSS ──────────────────────────── */
     .n-badge {
+        display: inline-block;
+        height: 16px;
+        width: auto;
+        vertical-align: middle;
+        margin-right: 6px;
+    }
+    .n-badge-css {
         display: inline-block;
         background: var(--amarelo);
         color: var(--preto);
@@ -342,7 +349,7 @@
         </div>
         <div class="cab-marca">
             {% if logo_b64 %}
-            <img src="{{ logo_b64 }}" style="height: 28px; max-width: 90px; object-fit: contain; vertical-align: middle; filter: brightness(0) invert(1);">
+            <img src="{{ logo_b64 }}" style="height: 32px; max-width: 120px; object-fit: contain; vertical-align: middle;">
             {% else %}
             <div class="wordmark" style="text-align:right"><span class="n">N</span>OROAÇO</div>
             <div class="tagline" style="text-align:right">FERRO E AÇO</div>
@@ -365,7 +372,11 @@
 
 {# Rodapé direito — N badge + página #}
 <div class="running-footer">
-    <span class="n-badge">N</span>
+    {% if logo_n_b64 %}
+    <img src="{{ logo_n_b64 }}" class="n-badge">
+    {% else %}
+    <span class="n-badge-css">N</span>
+    {% endif %}
     <span class="rodape-pagina"></span>
 </div>
 
@@ -391,7 +402,8 @@
 {% for carga in cargas %}
 <div class="carga-bloco">
     <div class="carga-header">
-        <div class="ch-cell carga-numero"><span class="n-badge">N</span>Carga #{{ carga.nrocarga }}</div>
+        <div class="ch-cell carga-numero">
+            {% if logo_n_b64 %}<img src="{{ logo_n_b64 }}" class="n-badge">{% else %}<span class="n-badge-css">N</span>{% endif %}Carga #{{ carga.nrocarga }}</div>
         <div class="ch-cell carga-nome">{{ carga.nome_carga or '—' }}</div>
         {% if carga.dt_saida %}
         <div class="ch-cell carga-meta"><span class="lbl">SAÍDA</span> {{ carga.dt_saida }}</div>

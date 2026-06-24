@@ -11,16 +11,16 @@ logger = logging.getLogger(__name__)
 # Pasta dos templates compartilhados (base.html, etc)
 PASTA_TEMPLATES_BASE = Path(__file__).parent / "templates"
 
-_LOGO_PATH = PASTA_TEMPLATES_BASE / "logo.png"
+_LOGO_PATH   = PASTA_TEMPLATES_BASE / "Logo_branco_amarelo.png"
+_LOGO_N_PATH = PASTA_TEMPLATES_BASE / "letra_N_noroaco.png"
 
 
-def _carregar_logo() -> str | None:
-    if not _LOGO_PATH.exists():
+def _img_b64(path: Path) -> str | None:
+    if not path.exists():
         return None
-    ext = _LOGO_PATH.suffix.lstrip(".").lower()
+    ext = path.suffix.lstrip(".").lower()
     mime = "svg+xml" if ext == "svg" else ext
-    dados = _LOGO_PATH.read_bytes()
-    return f"data:image/{mime};base64,{base64.b64encode(dados).decode()}"
+    return f"data:image/{mime};base64,{base64.b64encode(path.read_bytes()).decode()}"
 
 # Pasta dos relatórios (cada relatório tem seu template.html)
 PASTA_RELATORIOS = Path(__file__).parent.parent / "relatorios"
@@ -72,7 +72,8 @@ def renderizar_html(
         "titulo": titulo,
         "subtitulo": subtitulo,
         "data_geracao": datetime.now().strftime("%d/%m/%Y às %H:%M"),
-        "logo_b64": _carregar_logo(),
+        "logo_b64":   _img_b64(_LOGO_PATH),
+        "logo_n_b64": _img_b64(_LOGO_N_PATH),
     }
 
     html_renderizado = template.render(**contexto)
