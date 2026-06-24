@@ -31,10 +31,8 @@
         }
     }
     @page :first {
-        @top-center {
-            content: element(cabecalho-completo);
-            vertical-align: bottom;
-        }
+        margin-top: 0;
+        @top-center { content: none; }
     }
 {% endblock %}
 
@@ -84,8 +82,8 @@
         line-height: 1.3;
     }
 
-    /* ── Cabeçalho completo (página 1) ────────────────────────────── */
-    .running-header-completo { position: running(cabecalho-completo); display: block; }
+    /* ── Cabeçalho completo (página 1) — flow normal ──────────────── */
+    .running-header-completo { display: block; margin-bottom: 16px; }
 
     .cab-wrap {
         display: flex;
@@ -95,7 +93,7 @@
         background: var(--preto);
         border-bottom: 3px solid var(--amarelo);
         padding: 7px 12px;
-        border-radius: 1px 1px 0 0;
+        border-radius: 1px;
     }
     .cab-info  { flex: 1; text-align: left; }
     .cab-marca { flex: 0 0 auto; white-space: nowrap; text-align: right; }
@@ -177,16 +175,20 @@
 
     /* ── KPIs ──────────────────────────────────────────────────────── */
     .kpi-faixa {
-        display: flex;
-        gap: 9px;
-        margin: 2px 0 16px 0;
+        display: table;
+        table-layout: fixed;
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 8px 0;
+        margin: 0 0 16px 0;
     }
     .kpi-card {
-        flex: 1;
+        display: table-cell;
         background: var(--preto);
         border-radius: 1px;
         border-left: 4px solid var(--amarelo);
         padding: 11px 14px;
+        vertical-align: middle;
     }
     .kpi-card.laranja { border-left-color: var(--laranja); }
     .kpi-card.cinza   { border-left-color: var(--cinza); }
