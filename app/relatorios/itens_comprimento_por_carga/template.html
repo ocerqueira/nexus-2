@@ -11,12 +11,8 @@
             vertical-align: bottom;
         }
         @bottom-left {
-            content: "nexus";
-            font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
-            font-size: 8pt;
-            font-weight: 700;
-            letter-spacing: 2.5px;
-            color: #8B8B8B;
+            content: element(rodape-esquerda);
+            vertical-align: middle;
         }
         @bottom-center {
             content: "NOROAÇO · FERRO E AÇO";
@@ -24,9 +20,13 @@
             font-size: 6.5pt;
             letter-spacing: 1.5px;
             color: #E4E4E2;
+            vertical-align: middle;
         }
         @bottom-right {
-            content: element(rodape-direita);
+            content: "Página " counter(page) " de " counter(pages);
+            font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
+            font-size: 8pt;
+            color: #4D4D4C;
             vertical-align: middle;
         }
     }
@@ -129,7 +129,7 @@
         text-transform: uppercase;
     }
     .doc-params {
-        margin-top: 4px;
+        margin-top: 10px;
         font-size: 7.5pt;
         color: var(--cinza-claro);
         line-height: 1.35;
@@ -164,13 +164,19 @@
     }
     .cab-slim-params .lbl { color: var(--amarelo); font-weight: 700; }
 
-    /* ── Rodapé direito com N badge ────────────────────────────────── */
-    .running-footer { position: running(rodape-direita); display: flex; align-items: center; gap: 5px; }
-    .rodape-pagina::before {
-        content: "Página " counter(page) " de " counter(pages);
-        font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
+    /* ── Rodapé esquerdo: N badge + nexus ─────────────────────────── */
+    .running-footer-esq {
+        position: running(rodape-esquerda);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+    }
+    .n-badge-footer { height: 14px; width: auto; vertical-align: middle; }
+    .footer-nexus {
         font-size: 8pt;
-        color: var(--preto-2);
+        font-weight: 700;
+        letter-spacing: 2.5px;
+        color: #8B8B8B;
     }
 
     /* ── KPIs ──────────────────────────────────────────────────────── */
@@ -263,7 +269,8 @@
     /* ── Tabela ────────────────────────────────────────────────────── */
     .carga-tabela {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         table-layout: fixed;
         font-size: 8.5pt;
     }
@@ -367,14 +374,14 @@
     </div>
 </div>
 
-{# Rodapé direito — N badge + página #}
-<div class="running-footer">
+{# Rodapé esquerdo — N badge + nexus #}
+<div class="running-footer-esq">
     {% if logo_n_b64 %}
-    <img src="{{ logo_n_b64 }}" class="n-badge">
+    <img src="{{ logo_n_b64 }}" class="n-badge-footer">
     {% else %}
     <span class="n-badge-css">N</span>
     {% endif %}
-    <span class="rodape-pagina"></span>
+    <span class="footer-nexus">nexus</span>
 </div>
 
 {% if total_itens == 0 %}
