@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse
@@ -93,10 +94,16 @@ def _parse_horarios(horarios_str: str) -> list[dict]:
     return result
 
 
+_TZ_SP = ZoneInfo("America/Sao_Paulo")
+_TZ_UTC = ZoneInfo("UTC")
+
+
 def _fmt_dt(dt) -> str:
     if not dt:
         return "—"
-    return dt.strftime("%d/%m/%y %H:%M")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_TZ_UTC)
+    return dt.astimezone(_TZ_SP).strftime("%d/%m/%y %H:%M")
 
 
 def _fmt_date(dt) -> str:
