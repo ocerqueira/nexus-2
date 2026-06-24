@@ -20,11 +20,8 @@
         size: A4 landscape;
         margin: 2.45cm 1.1cm 1.45cm 1.1cm;
         @top-left   { content: none; }
+        @top-center { content: none; }
         @top-right  { content: none; }
-        @top-center {
-            content: element(cabecalho-running);
-            vertical-align: bottom;
-        }
         @bottom-left {
             content: "nexus";
             font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
@@ -60,11 +57,16 @@
     .rodape { display: none; }
 
     /* ── Running header ────────────────────────────────────────────── */
-    .running-header { position: running(cabecalho-running); }
+    /* position: fixed repete em cada página e posiciona relativo à folha (não ao content area) */
+    .running-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+    }
 
     .cab-wrap {
-        width: calc(100% + 2.2cm);  /* sangra 1.1cm em cada lado para atingir largura total da folha */
-        margin-left: -1.1cm;
+        width: 100%;
         background: var(--preto);
         border-bottom: 3px solid var(--amarelo);
         display: table;
