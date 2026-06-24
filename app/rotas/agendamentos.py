@@ -63,8 +63,8 @@ class CriarAgendamento(BaseModel):
     )
     frequencia: str = Field(
         ...,
-        pattern="^(diaria|semanal|mensal)$",
-        description="`diaria` | `semanal` (requer dia_semana) | `mensal` (requer dia_mes)",
+        pattern="^(diaria|semanal|mensal|intervalo)$",
+        description="`diaria` | `semanal` (requer dia_semana) | `mensal` (requer dia_mes) | `intervalo` (requer intervalo_minutos)",
     )
     dia_semana: int | None = Field(
         None,
@@ -78,9 +78,14 @@ class CriarAgendamento(BaseModel):
         le=31,
         description="Dia do mês para frequência mensal (1-31)",
     )
+    intervalo_minutos: int | None = Field(
+        None,
+        ge=1,
+        description="Minutos entre execuções (apenas quando frequencia=intervalo). Ex: 10 = a cada 10 min",
+    )
     horarios: list[Horario] = Field(
-        ...,
-        description="Lista de horários de envio no dia. Ex: [{hora:8, minuto:0}, {hora:18, minuto:0}]",
+        default_factory=list,
+        description="Lista de horários de envio no dia. Ex: [{hora:8, minuto:0}, {hora:18, minuto:0}]. Ignorado quando frequencia=intervalo.",
     )
     apenas_dias_uteis: bool = Field(
         False,
@@ -103,12 +108,10 @@ class CriarAgendamento(BaseModel):
         "json_schema_extra": {
             "example": {
                 "usuario_id": 1,
-                "tipo_recurso": "relatorio",
-                "recurso_id": 1,
-                "frequencia": "diaria",
-                "horarios": [{"hora": 8, "minuto": 0}],
-                "apenas_dias_uteis": True,
-                "timezone": "America/Sao_Paulo",
+                "tipo_recurso": "alerta",
+                "recurso_id": 2,
+                "frequencia": "intervalo",
+                "intervalo_minutos": 10,
                 "canais": ["whatsapp"],
                 "parametros": {},
             }
@@ -124,11 +127,12 @@ class AtualizarAgendamento(BaseModel):
     recurso_id: int | None = None
     frequencia: str | None = Field(
         None,
-        pattern="^(diaria|semanal|mensal)$",
-        description="`diaria` | `semanal` | `mensal`",
+        pattern="^(diaria|semanal|mensal|intervalo)$",
+        description="`diaria` | `semanal` | `mensal` | `intervalo`",
     )
     dia_semana: int | None = Field(None, ge=1, le=7, description="1=seg ... 7=dom")
     dia_mes: int | None = Field(None, ge=1, le=31)
+    intervalo_minutos: int | None = Field(None, ge=1, description="Minutos entre execuções (frequencia=intervalo)")
     horarios: list[Horario] | None = None
     apenas_dias_uteis: bool | None = None
     timezone: str | None = Field(None, description="Timezone IANA (ex: America/Cuiaba)")
@@ -164,6 +168,11 @@ def _validar_frequencia(dados: dict) -> None:
             status_code=400,
             detail="Frequência 'mensal' exige o campo 'dia_mes' (1-31)",
         )
+    if dados.get("frequencia") == "intervalo" and not dados.get("intervalo_minutos"):
+        raise HTTPException(
+            status_code=400,
+            detail="Frequência 'intervalo' exige o campo 'intervalo_minutos' (>= 1)",
+        )
 
 
 # =============================================================================
@@ -186,7 +195,7 @@ def listar_proximas_execucoes() -> dict:
             conexao.execute(
                 text("""
                     SELECT a.id, a.usuario_id, a.tipo_recurso, a.recurso_id,
-                           a.frequencia, a.dia_semana, a.dia_mes, a.horarios,
+                           a.frequencia, a.dia_semana, a.dia_mes, a.intervalo_minutos, a.horarios,
                            a.apenas_dias_uteis, a.timezone, a.parametros, a.canais,
                            a.ultimo_envio, a.proximo_envio,
                            COALESCE(r.nome, al.nome) AS recurso_nome,
@@ -276,7 +285,7 @@ def listar_agendamentos(
     with engine.connect() as conexao:
         consulta = """
             SELECT id, usuario_id, tipo_recurso, recurso_id,
-                   frequencia, dia_semana, dia_mes, horarios,
+                   frequencia, dia_semana, dia_mes, intervalo_minutos, horarios,
                    apenas_dias_uteis, timezone, parametros, canais,
                    ativo, ultimo_envio, proximo_envio,
                    criado_em, atualizado_em
@@ -333,6 +342,7 @@ def criar_agendamento(dados: CriarAgendamento) -> dict:
         "horarios": horarios_jsonb,
         "dia_semana": ag.get("dia_semana"),
         "dia_mes": ag.get("dia_mes"),
+        "intervalo_minutos": ag.get("intervalo_minutos"),
         "apenas_dias_uteis": ag.get("apenas_dias_uteis", False),
         "timezone": ag.get("timezone", "America/Sao_Paulo"),
     }
@@ -348,12 +358,12 @@ def criar_agendamento(dados: CriarAgendamento) -> dict:
             text("""
                 INSERT INTO agendamentos (
                     usuario_id, tipo_recurso, recurso_id,
-                    frequencia, dia_semana, dia_mes,
+                    frequencia, dia_semana, dia_mes, intervalo_minutos,
                     horarios, apenas_dias_uteis,
                     timezone, parametros, canais, proximo_envio
                 ) VALUES (
                     :usuario_id, :tipo_recurso, :recurso_id,
-                    :frequencia, :dia_semana, :dia_mes,
+                    :frequencia, :dia_semana, :dia_mes, :intervalo_minutos,
                     :horarios, :apenas_dias_uteis,
                     :timezone, :parametros, :canais, :proximo_envio
                 )
@@ -366,6 +376,7 @@ def criar_agendamento(dados: CriarAgendamento) -> dict:
                 "frequencia": ag["frequencia"],
                 "dia_semana": ag.get("dia_semana"),
                 "dia_mes": ag.get("dia_mes"),
+                "intervalo_minutos": ag.get("intervalo_minutos"),
                 "horarios": json.dumps(horarios_jsonb),
                 "apenas_dias_uteis": ag["apenas_dias_uteis"],
                 "timezone": ag.get("timezone", "America/Sao_Paulo"),
@@ -399,7 +410,7 @@ def marcar_executado(agendamento_id: int) -> dict:
             conexao.execute(
                 text("""
                     SELECT id, frequencia, horarios, dia_semana, dia_mes,
-                           apenas_dias_uteis, timezone
+                           intervalo_minutos, apenas_dias_uteis, timezone
                     FROM agendamentos
                     WHERE id = :id AND ativo = TRUE
                 """),
@@ -480,6 +491,7 @@ def atualizar_agendamento(
         "horarios",
         "dia_semana",
         "dia_mes",
+        "intervalo_minutos",
         "apenas_dias_uteis",
         "timezone",
     }
@@ -494,7 +506,7 @@ def atualizar_agendamento(
                 conexao.execute(
                     text("""
                         SELECT id, frequencia, horarios, dia_semana,
-                               dia_mes, apenas_dias_uteis, timezone
+                               dia_mes, intervalo_minutos, apenas_dias_uteis, timezone
                         FROM agendamentos
                         WHERE id = :id
                     """),

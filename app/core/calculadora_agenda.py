@@ -178,6 +178,16 @@ def _proximo_mes(data_atual: date, dia_alvo: int) -> date:
         return date(ano, mes, 28)
 
 
+def calcular_proximo_envio_intervalo(
+    agendamento: dict,
+    a_partir_de: datetime | None = None,
+) -> datetime:
+    """Próximo envio = agora + intervalo_minutos. Retorna UTC naive."""
+    agora_utc = _agora_utc(a_partir_de)
+    intervalo = agendamento["intervalo_minutos"]
+    return (agora_utc + timedelta(minutes=intervalo)).replace(tzinfo=None)
+
+
 def calcular_proximo_envio(
     agendamento: dict,
     a_partir_de: datetime | None = None,
@@ -201,5 +211,7 @@ def calcular_proximo_envio(
         return calcular_proximo_envio_semanal(agendamento, a_partir_de, tz_str)
     elif frequencia == "mensal":
         return calcular_proximo_envio_mensal(agendamento, a_partir_de, tz_str)
+    elif frequencia == "intervalo":
+        return calcular_proximo_envio_intervalo(agendamento, a_partir_de)
     else:
         raise ValueError(f"Frequência não suportada: {frequencia}")

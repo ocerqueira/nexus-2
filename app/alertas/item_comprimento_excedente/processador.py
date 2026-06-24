@@ -6,6 +6,7 @@ Fonte: ERP Firebird (VD_CARGA + ARQES13 + ARQES15 + ARQ_ITENS_DEF_TELHA + PCP_FA
 import hashlib
 import json
 import logging
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,20 @@ logger = logging.getLogger(__name__)
 
 ARQUIVO_CONSULTAS = Path(__file__).parent / "consultas.sql"
 CONEXAO_ERP = "REPLICA_TERRA"
+
+
+def _limpar_telefone(fone: Any) -> str | None:
+    """Normaliza para formato WhatsApp brasileiro: 55DDNNNNNNNNN (12-13 dígitos)."""
+    if not fone:
+        return None
+    digits = re.sub(r"\D", "", str(fone))
+    if not digits:
+        return None
+    if not digits.startswith("55"):
+        digits = "55" + digits
+    if len(digits) < 12 or len(digits) > 13:
+        return None
+    return digits
 
 
 class ProcessadorItemComprimentoExcedente:
@@ -115,13 +130,29 @@ class ProcessadorItemComprimentoExcedente:
         )
         fingerprint = hashlib.sha256(json.dumps(chaves_dedup).encode()).hexdigest()
 
-        # ── 6. Payload ─────────────────────────────────────────────────
+        # ── 6. Contatos dos vendedores/assistentes do ERP ─────────────
+        contatos_setores = []
+        vistos: set[str] = set()
+        colunas_vend = {"cod_vendedor", "nome_vendedor", "telefone_vendedor", "telefone_vendedor2"}
+        if colunas_vend.issubset(df.columns):
+            for _, row in df.drop_duplicates(subset=["cod_vendedor"]).iterrows():
+                nome = str(row.get("nome_vendedor") or "").strip()
+                fone1 = _limpar_telefone(row.get("telefone_vendedor"))
+                fone2 = _limpar_telefone(row.get("telefone_vendedor2"))
+                if fone1 and fone1 not in vistos:
+                    contatos_setores.append({"nome": nome, "whatsapp": fone1, "setor": "Vendedor"})
+                    vistos.add(fone1)
+                if fone2 and fone2 not in vistos:
+                    contatos_setores.append({"nome": f"{nome} (Assistente)", "whatsapp": fone2, "setor": "Assistente"})
+                    vistos.add(fone2)
+
+        # ── 7. Payload ─────────────────────────────────────────────────
         return {
             "encontrou_dados": True,
             "total": total,
             "resumo": resumo,
             "dados": df.to_dict("records"),
-            "contatos_setores": [],   # populado pelo nexus_metas quando disponível
+            "contatos_setores": contatos_setores,
             "limites": {},
             "fingerprint": fingerprint,
             "estatisticas": {
