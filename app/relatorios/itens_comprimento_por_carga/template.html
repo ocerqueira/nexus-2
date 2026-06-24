@@ -4,6 +4,7 @@
     @page {
         size: 297mm 210mm;
         margin: 2.45cm 1.1cm 1.45cm 1.1cm;
+        border: 10px solid #2C2925;
         @top-left   { content: none; width: 0; }
         @top-right  { content: none; width: 0; }
         @top-center {
@@ -11,22 +12,22 @@
             vertical-align: bottom;
         }
         @bottom-left {
-            content: element(rodape-esquerda);
+            content: "Página " counter(page) " de " counter(pages);
+            font-family: 'Gotham', 'Futura', 'Century Gothic', Arial, sans-serif;
+            font-size: 8pt;
+            color: #4D4D4C;
             vertical-align: middle;
         }
         @bottom-center {
             content: "NOROAÇO · FERRO E AÇO";
-            font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
+            font-family: 'Gotham', 'Futura', 'Century Gothic', Arial, sans-serif;
             font-size: 6.5pt;
             letter-spacing: 1.5px;
             color: #E4E4E2;
             vertical-align: middle;
         }
         @bottom-right {
-            content: "Página " counter(page) " de " counter(pages);
-            font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
-            font-size: 8pt;
-            color: #4D4D4C;
+            content: element(rodape-n);
             vertical-align: middle;
         }
     }
@@ -53,7 +54,7 @@
 
     /* ── Tipografia ────────────────────────────────────────────────── */
     body {
-        font-family: 'Futura', 'Century Gothic', 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
+        font-family: 'Gotham', 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
         color: var(--preto);
         font-size: 9pt;
         hyphens: none;
@@ -164,9 +165,9 @@
     }
     .cab-slim-params .lbl { color: var(--amarelo); font-weight: 700; }
 
-    /* ── Rodapé esquerdo: N badge + nexus ─────────────────────────── */
+    /* ── Rodapé direito: N badge + nexus ──────────────────────────── */
     .running-footer-esq {
-        position: running(rodape-esquerda);
+        position: running(rodape-n);
         display: flex;
         align-items: center;
         gap: 7px;
@@ -179,40 +180,15 @@
         color: #8B8B8B;
     }
 
-    /* ── KPIs ──────────────────────────────────────────────────────── */
-    .kpi-faixa {
-        display: table;
-        table-layout: fixed;
-        width: calc(100% + 8px);
-        border-collapse: separate;
-        border-spacing: 8px 0;
-        margin: 0 -4px 16px -4px;
-    }
-    .kpi-card {
-        display: table-cell;
-        background: var(--preto);
-        border-radius: 1px;
-        border-left: 4px solid var(--amarelo);
-        padding: 11px 14px;
-        vertical-align: middle;
-    }
-    .kpi-card.laranja { border-left-color: var(--laranja); }
-    .kpi-card.cinza   { border-left-color: var(--cinza); }
-    .kpi-valor {
-        font-size: 22pt;
+    /* ── Nome da unidade no cabeçalho ──────────────────────────────── */
+    .cab-unidade {
+        font-size: 12pt;
         font-weight: 800;
-        color: var(--amarelo);
-        line-height: 1;
-    }
-    .kpi-card.laranja .kpi-valor { color: var(--laranja); }
-    .kpi-card.cinza   .kpi-valor { color: #FFFFFF; }
-    .kpi-label {
-        margin-top: 4px;
-        font-size: 7.5pt;
-        font-weight: 600;
-        letter-spacing: 1.2px;
+        letter-spacing: 2px;
+        color: #FFFFFF;
         text-transform: uppercase;
-        color: var(--cinza-claro);
+        text-align: right;
+        white-space: nowrap;
     }
 
     /* ── Blocos por carga ──────────────────────────────────────────── */
@@ -352,11 +328,8 @@
             </div>
         </div>
         <div class="cab-marca">
-            {% if logo_b64 %}
-            <img src="{{ logo_b64 }}" style="height: 42px; max-width: 150px; object-fit: contain; vertical-align: middle;">
-            {% else %}
-            <div class="wordmark" style="text-align:right"><span class="n">N</span>OROAÇO</div>
-            <div class="tagline" style="text-align:right">FERRO E AÇO</div>
+            {% if subtitulo %}
+            <div class="cab-unidade">{{ subtitulo }}</div>
             {% endif %}
         </div>
     </div>
@@ -388,26 +361,10 @@
 <p class="sem-dados">Nenhum item com comprimento excedente encontrado{% if periodo is defined and periodo %} no período {{ periodo }}{% endif %}.</p>
 {% else %}
 
-<div class="kpi-faixa">
-    <div class="kpi-card">
-        <div class="kpi-valor">{{ total_cargas }}</div>
-        <div class="kpi-label">Cargas afetadas</div>
-    </div>
-    <div class="kpi-card laranja">
-        <div class="kpi-valor">{{ total_itens }}</div>
-        <div class="kpi-label">Itens excedentes</div>
-    </div>
-    <div class="kpi-card cinza">
-        <div class="kpi-valor">{{ maior_comprimento_m }}m</div>
-        <div class="kpi-label">Maior comprimento</div>
-    </div>
-</div>
-
 {% for carga in cargas %}
 <div class="carga-bloco">
     <div class="carga-header">
-        <div class="ch-cell carga-numero">
-            {% if logo_n_b64 %}<img src="{{ logo_n_b64 }}" class="n-badge">{% else %}<span class="n-badge-css">N</span>{% endif %}Carga #{{ carga.nrocarga }}</div>
+        <div class="ch-cell carga-numero">Carga #{{ carga.nrocarga }}</div>
         <div class="ch-cell carga-nome">{{ carga.nome_carga or '—' }}</div>
         {% if carga.dt_saida %}
         <div class="ch-cell carga-meta"><span class="lbl">SAÍDA</span> {{ carga.dt_saida }}</div>
