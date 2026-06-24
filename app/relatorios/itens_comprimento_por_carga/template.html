@@ -95,7 +95,7 @@
         background: var(--preto);
         border-bottom: 3px solid var(--amarelo);
         padding: 7px 12px;
-        border-radius: 3px 3px 0 0;
+        border-radius: 1px 1px 0 0;
     }
     .cab-info  { flex: 1; text-align: left; }
     .cab-marca { flex: 0 0 auto; white-space: nowrap; text-align: right; }
@@ -177,21 +177,16 @@
 
     /* ── KPIs ──────────────────────────────────────────────────────── */
     .kpi-faixa {
-        display: table;
-        table-layout: fixed;
-        width: calc(100% + 18px);
-        border-collapse: separate;
-        border-spacing: 9px 0;
-        margin: 2px 0 16px -9px;
+        display: flex;
+        gap: 9px;
+        margin: 2px 0 16px 0;
     }
     .kpi-card {
-        display: table-cell;
-        width: 33.33%;
+        flex: 1;
         background: var(--preto);
-        border-radius: 3px;
+        border-radius: 1px;
         border-left: 4px solid var(--amarelo);
         padding: 11px 14px;
-        vertical-align: middle;
     }
     .kpi-card.laranja { border-left-color: var(--laranja); }
     .kpi-card.cinza   { border-left-color: var(--cinza); }
@@ -216,7 +211,7 @@
     .carga-bloco {
         margin-bottom: 13px;
         border: 1px solid var(--cinza-claro);
-        border-radius: 3px;
+        border-radius: 1px;
         overflow: hidden;
         page-break-inside: avoid;
     }
@@ -267,6 +262,7 @@
     .carga-tabela {
         width: 100%;
         border-collapse: collapse;
+        table-layout: fixed;
         font-size: 8.5pt;
     }
     .carga-tabela th {
@@ -315,7 +311,7 @@
     .badge-tipo {
         display: inline-block;
         padding: 1px 7px;
-        border-radius: 3px;
+        border-radius: 1px;
         font-size: 6.5pt;
         font-weight: 800;
         letter-spacing: 0.5px;
