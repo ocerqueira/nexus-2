@@ -1,21 +1,6 @@
 {% extends "base.html" %}
 
-{% block estilos_extras %}
-<style>
-    /* ── Identidade visual NOROAÇO ─────────────────────────────────── */
-    :root {
-        --preto:        #2C2925;
-        --preto-2:      #4D4D4C;
-        --amarelo:      #FFB71B;
-        --laranja:      #F58220;
-        --cinza:        #8B8B8B;
-        --cinza-claro:  #E4E4E2;
-        --linha:        #ECECEA;
-        --zebra:        #FAFAF9;
-        --fundo-th:     #F4F3F1;
-    }
-
-    /* ── @page base: cabeçalho slim nas páginas 2+ ─────────────────── */
+{% block page_css %}
     @page {
         size: 297mm 210mm;
         margin: 2.45cm 1.1cm 1.45cm 1.1cm;
@@ -31,27 +16,41 @@
             font-size: 8pt;
             font-weight: 700;
             letter-spacing: 2.5px;
-            color: var(--cinza);
+            color: #8B8B8B;
         }
         @bottom-center {
             content: "NOROAÇO · FERRO E AÇO";
             font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
             font-size: 6.5pt;
             letter-spacing: 1.5px;
-            color: var(--cinza-claro);
+            color: #E4E4E2;
         }
         @bottom-right {
             content: element(rodape-direita);
             vertical-align: middle;
         }
     }
-
-    /* ── @page :first: cabeçalho completo na primeira página ────────── */
     @page :first {
         @top-center {
             content: element(cabecalho-completo);
             vertical-align: bottom;
         }
+    }
+{% endblock %}
+
+{% block estilos_extras %}
+<style>
+    /* ── Identidade visual NOROAÇO ─────────────────────────────────── */
+    :root {
+        --preto:        #2C2925;
+        --preto-2:      #4D4D4C;
+        --amarelo:      #FFB71B;
+        --laranja:      #F58220;
+        --cinza:        #8B8B8B;
+        --cinza-claro:  #E4E4E2;
+        --linha:        #ECECEA;
+        --zebra:        #FAFAF9;
+        --fundo-th:     #F4F3F1;
     }
 
     /* ── Tipografia ────────────────────────────────────────────────── */
@@ -59,7 +58,7 @@
         font-family: 'Futura', 'Century Gothic', 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
         color: var(--preto);
         font-size: 9pt;
-        -weasy-hyphens: none;
+        hyphens: none;
     }
 
     .rodape { display: none; }
