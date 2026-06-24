@@ -60,17 +60,19 @@
     .rodape { display: none; }
 
     /* ── Running header ────────────────────────────────────────────── */
-    .running-header { position: running(cabecalho-running); display: block; width: 100%; }
+    /* @top-center no WeasyPrint auto-dimensiona pelo conteúdo; usa largura
+       absoluta do A4 paisagem (297mm) menos as margens (1.1cm cada lado). */
+    .running-header { position: running(cabecalho-running); display: block; }
 
     .cab-wrap {
-        display: -weasy-flex;
         display: flex;
         align-items: center;
-        width: 100%;
+        width: 297mm;       /* A4 landscape total */
+        margin-left: -11mm; /* cancela margem esquerda da página (1.1cm) */
         box-sizing: border-box;
         background: var(--preto);
         border-bottom: 3px solid var(--amarelo);
-        padding: 7px 12px;
+        padding: 7px 22px;  /* padding extra compensa as margens canceladas */
     }
     .cab-marca { flex: 0 0 38%; white-space: nowrap; }
     .cab-info  { flex: 1; text-align: right; }
