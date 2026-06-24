@@ -20,5 +20,8 @@
         'hx-post="/admin/usuarios/' ~ u.id ~ '/reativar" hx-target="#main" hx-swap="innerHTML"',
         "success") }}
     {% endif %}
+    {{ btn_acao("Deletar",
+        'hx-delete="/admin/usuarios/' ~ u.id ~ '/deletar" hx-target="#main" hx-swap="innerHTML" hx-confirm="DELETAR PERMANENTEMENTE ' ~ u.nome ~ '? Esta ação não pode ser desfeita."',
+        "danger") }}
   </td>
 </tr>

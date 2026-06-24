@@ -147,6 +147,9 @@
               'hx-post="/admin/agendamentos/' ~ ag.id ~ '/reativar" hx-target="#main" hx-swap="innerHTML"',
               "success") }}
           {% endif %}
+          {{ btn_acao("Deletar",
+              'hx-delete="/admin/agendamentos/' ~ ag.id ~ '/deletar" hx-target="#main" hx-swap="innerHTML" hx-confirm="DELETAR PERMANENTEMENTE este agendamento? Esta ação não pode ser desfeita."',
+              "danger") }}
         </div>
       </div>
       {% endfor %}

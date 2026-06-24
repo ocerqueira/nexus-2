@@ -213,6 +213,20 @@ def admin_relatorios_form(request: Request):
     return templates.TemplateResponse(request, "admin/relatorios_form.html", {})
 
 
+@router.delete("/relatorios/{relatorio_id}/deletar", response_class=HTMLResponse)
+def admin_relatorios_deletar(request: Request, relatorio_id: int):
+    try:
+        with engine.begin() as c:
+            c.execute(text("DELETE FROM relatorios WHERE id=:id"), {"id": relatorio_id})
+        msg, msg_tipo = "Relatório deletado permanentemente.", "ok"
+    except Exception as e:
+        msg, msg_tipo = f"Erro ao deletar: {e}", "erro"
+    return templates.TemplateResponse(request, "admin/relatorios.html", {
+        "relatorios": _relatorios_db(), "busca": "", "status_filtro": "",
+        "msg": msg, "msg_tipo": msg_tipo,
+    })
+
+
 @router.post("/relatorios/{relatorio_id}/ativar", response_class=HTMLResponse)
 def admin_relatorios_ativar(request: Request, relatorio_id: int):
     with engine.begin() as c:
@@ -304,6 +318,18 @@ def _alertas_ctx(status_filtro: str = "", msg: str = "", msg_tipo: str = "") -> 
 def admin_alertas(request: Request, status_filtro: str = Query("")):
     return templates.TemplateResponse(request, "admin/alertas.html",
                                       _alertas_ctx(status_filtro))
+
+
+@router.delete("/alertas/{alerta_id}/deletar", response_class=HTMLResponse)
+def admin_alertas_deletar(request: Request, alerta_id: int):
+    try:
+        with engine.begin() as c:
+            c.execute(text("DELETE FROM alertas WHERE id=:id"), {"id": alerta_id})
+        msg, msg_tipo = "Alerta deletado permanentemente.", "ok"
+    except Exception as e:
+        msg, msg_tipo = f"Erro ao deletar: {e}", "erro"
+    return templates.TemplateResponse(request, "admin/alertas.html",
+                                      _alertas_ctx(msg=msg, msg_tipo=msg_tipo))
 
 
 @router.post("/alertas/{alerta_id}/ativar", response_class=HTMLResponse)
@@ -456,19 +482,24 @@ def admin_condicao_rm_dest(request: Request, condicao_id: int, usuario_id: int):
 # CONEXÕES
 # =============================================================================
 
-def _conexoes_db() -> list[dict]:
+def _conexoes_db(status_filtro: str = "") -> list[dict]:
+    filtro_sql = ""
+    if status_filtro == "ativo":
+        filtro_sql = " WHERE ativo = TRUE"
+    elif status_filtro == "inativo":
+        filtro_sql = " WHERE ativo = FALSE"
     with engine.connect() as c:
         rows = c.execute(text(
             "SELECT id, nome, tipo, host, porta, banco, usuario, observacoes, ativo "
-            "FROM conexoes_bd ORDER BY nome"
+            f"FROM conexoes_bd{filtro_sql} ORDER BY nome"
         )).mappings().all()
     return [dict(r) for r in rows]
 
 
 @router.get("/conexoes", response_class=HTMLResponse)
-def admin_conexoes(request: Request):
+def admin_conexoes(request: Request, status_filtro: str = Query("")):
     return templates.TemplateResponse(request, "admin/conexoes.html", {
-        "conexoes": _conexoes_db(), "msg": "", "msg_tipo": "",
+        "conexoes": _conexoes_db(status_filtro), "msg": "", "msg_tipo": "", "status_filtro": status_filtro,
     })
 
 
@@ -513,7 +544,20 @@ def admin_conexoes_desativar(request: Request, conexao_id: int):
     with engine.begin() as c:
         c.execute(text("UPDATE conexoes_bd SET ativo=FALSE, atualizado_em=NOW() WHERE id=:id"), {"id": conexao_id})
     return templates.TemplateResponse(request, "admin/conexoes.html", {
-        "conexoes": _conexoes_db(), "msg": "Conexão desativada.", "msg_tipo": "ok",
+        "conexoes": _conexoes_db(), "msg": "Conexão desativada.", "msg_tipo": "ok", "status_filtro": "",
+    })
+
+
+@router.delete("/conexoes/{conexao_id}/deletar", response_class=HTMLResponse)
+def admin_conexoes_deletar(request: Request, conexao_id: int):
+    try:
+        with engine.begin() as c:
+            c.execute(text("DELETE FROM conexoes_bd WHERE id=:id"), {"id": conexao_id})
+        msg, msg_tipo = "Conexão deletada permanentemente.", "ok"
+    except Exception as e:
+        msg, msg_tipo = f"Erro ao deletar: {e}", "erro"
+    return templates.TemplateResponse(request, "admin/conexoes.html", {
+        "conexoes": _conexoes_db(), "msg": msg, "msg_tipo": msg_tipo, "status_filtro": "",
     })
 
 
@@ -672,6 +716,18 @@ def admin_usuarios_desativar(request: Request, usuario_id: int):
         c.execute(text("UPDATE usuarios SET ativo=FALSE, atualizado_em=NOW() WHERE id=:id"), {"id": usuario_id})
     return templates.TemplateResponse(request, "admin/usuarios.html",
                                       _usuarios_ctx(msg="Usuário desativado.", msg_tipo="ok"))
+
+
+@router.delete("/usuarios/{usuario_id}/deletar", response_class=HTMLResponse)
+def admin_usuarios_deletar(request: Request, usuario_id: int):
+    try:
+        with engine.begin() as c:
+            c.execute(text("DELETE FROM usuarios WHERE id=:id"), {"id": usuario_id})
+        msg, msg_tipo = "Usuário deletado permanentemente.", "ok"
+    except Exception as e:
+        msg, msg_tipo = f"Erro ao deletar: {e}", "erro"
+    return templates.TemplateResponse(request, "admin/usuarios.html",
+                                      _usuarios_ctx(msg=msg, msg_tipo=msg_tipo))
 
 
 @router.post("/usuarios/{usuario_id}/reativar", response_class=HTMLResponse)
@@ -858,6 +914,23 @@ def admin_agendamentos_desativar(request: Request, agendamento_id: int):
         "freq_filtro": "", "status_filtro": "", "pagina": 1,
         "total_paginas": max(1, -(-total // _AG_USUARIOS_POR_PAGINA)),
         "msg": "Agendamento desativado.", "msg_tipo": "ok",
+    })
+
+
+@router.delete("/agendamentos/{agendamento_id}/deletar", response_class=HTMLResponse)
+def admin_agendamentos_deletar(request: Request, agendamento_id: int):
+    try:
+        with engine.begin() as c:
+            c.execute(text("DELETE FROM agendamentos WHERE id=:id"), {"id": agendamento_id})
+        msg, msg_tipo = "Agendamento deletado permanentemente.", "ok"
+    except Exception as e:
+        msg, msg_tipo = f"Erro ao deletar: {e}", "erro"
+    grupos, total = _agendamentos_db()
+    return templates.TemplateResponse(request, "admin/agendamentos.html", {
+        "grupos": grupos, "total": total, "busca": "", "tipo_filtro": "",
+        "freq_filtro": "", "status_filtro": "", "pagina": 1,
+        "total_paginas": max(1, -(-total // _AG_USUARIOS_POR_PAGINA)),
+        "msg": msg, "msg_tipo": msg_tipo,
     })
 
 

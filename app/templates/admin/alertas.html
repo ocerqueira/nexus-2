@@ -95,6 +95,9 @@
             'hx-post="/admin/alertas/' ~ a.id ~ '/ativar" hx-target="#main" hx-swap="innerHTML"',
             "success") }}
         {% else %}<span class="text-xs text-slate-400">—</span>{% endif %}
+        {{ btn_acao("Deletar",
+            'hx-delete="/admin/alertas/' ~ a.id ~ '/deletar" hx-target="#main" hx-swap="innerHTML" hx-confirm="DELETAR PERMANENTEMENTE o alerta ' ~ a.nome ~ '? Esta ação não pode ser desfeita."',
+            "danger") }}
       </div>
     </div>
     {% endfor %}

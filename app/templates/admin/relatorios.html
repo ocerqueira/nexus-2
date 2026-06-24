@@ -116,6 +116,9 @@
                 'hx-post="/admin/relatorios/' ~ r.id ~ '/ativar" hx-target="#main" hx-swap="innerHTML"',
                 "success") }}
             {% else %}—{% endif %}
+            {{ btn_acao("Deletar",
+                'hx-delete="/admin/relatorios/' ~ r.id ~ '/deletar" hx-target="#main" hx-swap="innerHTML" hx-confirm="DELETAR PERMANENTEMENTE o relatório ' ~ r.nome ~ '? Esta ação não pode ser desfeita."',
+                "danger") }}
           </td>
         </tr>
         {% endfor %}

@@ -5,9 +5,19 @@
 <div class="mb-4 px-4 py-3 rounded-lg border text-xs {{ tipo_cls }}">{{ msg }}</div>
 {% endif %}
 
-<div class="flex items-center justify-between mb-4">
+<div class="flex flex-wrap items-center gap-3 mb-4">
   <h2 class="font-semibold text-slate-700">Conexões de banco de dados</h2>
-  <button class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+  <div class="flex gap-1.5 items-center">
+    <span class="text-xs text-slate-500">Status:</span>
+    {% for val, label in [("", "Todos"), ("ativo", "Ativo"), ("inativo", "Inativo")] %}
+    <button type="button"
+            class="px-3 py-1.5 text-xs rounded-full border transition-colors
+                   {{ 'bg-indigo-600 text-white border-indigo-600' if status_filtro == val else 'bg-white text-slate-600 border-slate-300 hover:border-indigo-300' }}"
+            hx-get="/admin/conexoes?status_filtro={{ val }}"
+            hx-target="#main" hx-swap="innerHTML">{{ label }}</button>
+    {% endfor %}
+  </div>
+  <button class="ml-auto inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
           hx-get="/admin/conexoes/form" hx-target="#modal-body" hx-swap="innerHTML">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -51,8 +61,8 @@
           <span id="status-cx-{{ cx.id }}" class="text-xs text-slate-400">—</span>
         </td>
         <td class="px-5 py-3.5 text-right">
+          <div class="flex gap-1.5 justify-end flex-wrap">
           {% if cx.ativo %}
-          <div class="flex gap-1.5 justify-end">
             {{ btn_acao("Testar",
                 'hx-post="/admin/conexoes/' ~ cx.id ~ '/testar" hx-target="#status-cx-' ~ cx.id ~ '" hx-swap="innerHTML"',
                 "ghost") }}
@@ -62,12 +72,15 @@
             {{ btn_acao("Desativar",
                 'hx-delete="/admin/conexoes/' ~ cx.id ~ '" hx-target="#main" hx-swap="innerHTML" hx-confirm="Desativar conexão ' ~ cx.nome ~ '?"',
                 "danger") }}
-          </div>
           {% else %}
-          {{ btn_acao("Reativar",
-              'hx-post="/admin/conexoes/' ~ cx.id ~ '/reativar" hx-target="#main" hx-swap="innerHTML"',
-              "success") }}
+            {{ btn_acao("Reativar",
+                'hx-post="/admin/conexoes/' ~ cx.id ~ '/reativar" hx-target="#main" hx-swap="innerHTML"',
+                "success") }}
           {% endif %}
+            {{ btn_acao("Deletar",
+                'hx-delete="/admin/conexoes/' ~ cx.id ~ '/deletar" hx-target="#main" hx-swap="innerHTML" hx-confirm="DELETAR PERMANENTEMENTE a conexão ' ~ cx.nome ~ '? Esta ação não pode ser desfeita."',
+                "danger") }}
+          </div>
         </td>
       </tr>
       {% endfor %}
