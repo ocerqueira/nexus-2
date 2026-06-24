@@ -56,7 +56,7 @@ class ProcessadorItemComprimentoExcedente:
     def verificar(parametros: dict) -> dict[str, Any]:
         cod_empresa = parametros.get("cod_empresa", 1)
         data_inicio = parametros.get("data_inicio") or (
-            date.today() - timedelta(days=30)
+            date.today() - timedelta(days=3)
         ).isoformat()
 
         # ── 1. Firebird: detectar itens com comprimento excedente ───────

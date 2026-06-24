@@ -47,14 +47,21 @@
 
       {# Canais #}
       <div class="flex items-start gap-3">
-        <span class="text-xs text-slate-500 w-24 flex-shrink-0 pt-0.5">Canais</span>
-        <div class="flex gap-1 flex-wrap">
-          {% for ch in (cd.canais if cd.canais else []) %}
-          {{ badge(ch, "blue") }}
-          {% else %}
-          <span class="text-xs text-slate-400">—</span>
+        <span class="text-xs text-slate-500 w-24 flex-shrink-0 pt-1.5">Canais</span>
+        <form hx-post="/admin/condicoes/{{ cd.id }}/canais"
+              hx-target="#cond-list-{{ alerta_id }}" hx-swap="outerHTML"
+              class="flex gap-3 items-center flex-wrap">
+          {% for ch, label in [("whatsapp", "WhatsApp"), ("email", "E-mail")] %}
+          <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" name="canais" value="{{ ch }}"
+                   {% if ch in (cd.canais or []) %}checked{% endif %}
+                   class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300">
+            {{ label }}
+          </label>
           {% endfor %}
-        </div>
+          <button type="submit"
+                  class="px-2 py-1 text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded">✓</button>
+        </form>
       </div>
 
       {# Último disparo #}

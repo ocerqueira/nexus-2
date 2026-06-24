@@ -441,6 +441,21 @@ def admin_condicao_cooldown(request: Request, condicao_id: int, cooldown: Annota
                                       {"condicao_id": condicao_id, "cooldown": cooldown})
 
 
+@router.post("/condicoes/{condicao_id}/canais", response_class=HTMLResponse)
+def admin_condicao_canais(request: Request, condicao_id: int, canais: list[str] = Form(default=[])):
+    canais_validos = [c for c in canais if c in ("whatsapp", "email")]
+    with engine.begin() as c:
+        row = c.execute(text("SELECT alerta_id FROM alertas_condicoes WHERE id=:id"),
+                        {"id": condicao_id}).mappings().first()
+        if not row:
+            return HTMLResponse("—")
+        c.execute(text("UPDATE alertas_condicoes SET canais=CAST(:v AS jsonb), atualizado_em=NOW() WHERE id=:id"),
+                  {"v": json.dumps(canais_validos), "id": condicao_id})
+        alerta_id = row["alerta_id"]
+    return templates.TemplateResponse(request, "admin/alertas_condicoes.html",
+                                      _cond_ctx(alerta_id))
+
+
 def _dest_ctx(condicao_id: int) -> dict:
     with engine.connect() as c:
         row = c.execute(text("SELECT destinatarios FROM alertas_condicoes WHERE id=:id"),
