@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Itens com Comprimento Excedente por Carga — PREVIEW</title>
+    <style>
+        :root {
+            --preto:        #2C2925;
+            --preto-2:      #4D4D4C;
+            --amarelo:      #FFB71B;
+            --laranja:      #F58220;
+            --cinza:        #8B8B8B;
+            --cinza-claro:  #E4E4E2;
+            --linha:        #ECECEA;
+            --zebra:        #FAFAF9;
+            --fundo-th:     #F4F3F1;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Century Gothic', 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
+            color: var(--preto);
+            font-size: 9pt;
+            background: #fff;
+            padding: 5px ;
+        }
+
+        /* ── Cabeçalho ─────────────────────────────────────────────── */
+        .cab-wrap {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            background: var(--preto);
+            border-bottom: 3px solid var(--amarelo);
+            padding: 7px 12px;
+        }
+        .cab-info  { flex: 1; text-align: left; }
+        .cab-marca { flex: 0 0 auto; white-space: nowrap; text-align: right; }
+
+        .wordmark {
+            font-weight: 800;
+            font-size: 16pt;
+            letter-spacing: -0.5px;
+            color: #FFFFFF;
+            line-height: 1;
+        }
+        .wordmark .n {
+            display: inline-block;
+            background: var(--amarelo);
+            color: var(--preto);
+            padding: 0 3px;
+            margin-right: 1px;
+            transform: skewX(-6deg);
+        }
+        .tagline {
+            font-size: 6.5pt;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: var(--amarelo);
+            margin-top: 3px;
+        }
+        .doc-titulo {
+            font-size: 11.5pt;
+            font-weight: 700;
+            color: #FFFFFF;
+            letter-spacing: 0.3px;
+            line-height: 1.1;
+            text-transform: uppercase;
+        }
+        .doc-params {
+            margin-top: 4px;
+            font-size: 7.5pt;
+            color: var(--cinza-claro);
+            line-height: 1.35;
+        }
+        .doc-params .lbl { color: var(--amarelo); font-weight: 700; letter-spacing: 0.5px; }
+        .doc-params .sep { color: var(--preto-2); padding: 0 5px; }
+
+        /* ── Conteúdo ──────────────────────────────────────────────── */
+        .conteudo { padding: 16px 12px; }
+
+        /* ── KPIs ──────────────────────────────────────────────────── */
+        .kpi-faixa {
+            display: table;
+            table-layout: fixed;
+            width: calc(100% + 18px);
+            border-collapse: separate;
+            border-spacing: 9px 0;
+            margin: 2px 0 16px -9px;
+        }
+        .kpi-card {
+            display: table-cell;
+            width: 33.33%;
+            background: var(--preto);
+            border-radius: 3px;
+            border-left: 4px solid var(--amarelo);
+            padding: 11px 14px;
+            vertical-align: middle;
+        }
+        .kpi-card.laranja { border-left-color: var(--laranja); }
+        .kpi-card.cinza   { border-left-color: var(--cinza); }
+        .kpi-valor {
+            font-size: 22pt;
+            font-weight: 800;
+            color: var(--amarelo);
+            line-height: 1;
+        }
+        .kpi-card.laranja .kpi-valor { color: var(--laranja); }
+        .kpi-card.cinza   .kpi-valor { color: #FFFFFF; }
+        .kpi-label {
+            margin-top: 4px;
+            font-size: 7.5pt;
+            font-weight: 600;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: var(--cinza-claro);
+        }
+
+        /* ── Blocos por carga ──────────────────────────────────────── */
+        .carga-bloco {
+            margin-bottom: 13px;
+            border: 1px solid var(--cinza-claro);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .carga-header {
+            background: var(--preto);
+            display: table;
+            width: 100%;
+            padding: 7px 12px;
+        }
+        .ch-cell { display: table-cell; vertical-align: middle; }
+        .carga-numero {
+            font-size: 10pt;
+            font-weight: 800;
+            color: var(--amarelo);
+            white-space: nowrap;
+            padding-right: 14px;
+        }
+        .carga-numero::before {
+            content: "N";
+            display: inline-block;
+            background: var(--amarelo);
+            color: var(--preto);
+            font-weight: 800;
+            font-size: 8pt;
+            padding: 0 4px;
+            margin-right: 7px;
+            transform: skewX(-6deg);
+        }
+        .carga-nome {
+            width: 100%;
+            color: var(--cinza-claro);
+            font-weight: 400;
+            font-size: 9pt;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .carga-meta {
+            text-align: right;
+            font-size: 7.5pt;
+            color: var(--cinza);
+            white-space: nowrap;
+            padding: 0 14px;
+        }
+        .carga-meta .lbl { color: var(--amarelo); font-weight: 700; }
+        .badge-contagem {
+            display: inline-block;
+            background: var(--laranja);
+            color: #FFFFFF;
+            border-radius: 10px;
+            padding: 2px 10px;
+            font-size: 7.5pt;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .ch-badge { text-align: right; white-space: nowrap; }
+
+        /* ── Tabela ────────────────────────────────────────────────── */
+        .carga-tabela {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8.5pt;
+        }
+        .carga-tabela th {
+            background: var(--fundo-th);
+            color: var(--preto-2);
+            font-weight: 700;
+            font-size: 7pt;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            padding: 5px 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--amarelo);
+            white-space: nowrap;
+        }
+        .carga-tabela td {
+            padding: 5px 12px;
+            border-bottom: 1px solid var(--linha);
+            color: var(--preto);
+            vertical-align: middle;
+        }
+        .carga-tabela tbody tr:nth-child(even) td { background: var(--zebra); }
+        .carga-tabela tr:last-child td { border-bottom: none; }
+
+        .col-c   { text-align: center; }
+        .col-num { text-align: right; }
+        .col-comprimento {
+            text-align: right;
+            font-weight: 800;
+            color: var(--laranja);
+            white-space: nowrap;
+            font-size: 9pt;
+        }
+        .col-excedente {
+            text-align: right;
+            font-size: 7.5pt;
+            font-weight: 700;
+            color: var(--cinza);
+            white-space: nowrap;
+        }
+        .produto-cel {
+            max-width: 230px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .badge-tipo {
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 3px;
+            font-size: 6.5pt;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+        .badge-telha { background: var(--preto-2); color: #FFFFFF; }
+        .badge-sbx   { background: var(--amarelo); color: var(--preto); }
+        .pedido-num  { font-weight: 800; color: var(--preto); }
+
+        /* ── Rodapé preview ────────────────────────────────────────── */
+        .rodape-preview {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 12px;
+            border-top: 1px solid var(--cinza-claro);
+            margin-top: 16px;
+            font-size: 7pt;
+            color: var(--cinza);
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+
+
+
+<!-- CONTEÚDO -->
+<div class="conteudo">
+
+    <!-- CABEÇALHO -->
+<div class="cab-wrap">
+    
+    <div class="cab-info">
+        <div class="doc-titulo">Itens com Comprimento Excedente por Carga</div>
+        <div class="doc-params">
+            <span class="lbl">PERÍODO</span> 21/06/2026 – 24/06/2026
+            <span class="sep">|</span>
+            <span class="lbl">GERADO EM</span> 24/06/2026 14:32
+        </div>
+    </div>
+
+    <div class="cab-marca">
+        <div class="wordmark"><span class="n">N</span>OROAÇO</div>
+        <div class="tagline">FERRO E AÇO</div>
+    </div>
+</div>
+
+    <!-- KPIs -->
+    <div class="kpi-faixa">
+        <div class="kpi-card">
+            <div class="kpi-valor">3</div>
+            <div class="kpi-label">Cargas afetadas</div>
+        </div>
+        <div class="kpi-card laranja">
+            <div class="kpi-valor">12</div>
+            <div class="kpi-label">Itens excedentes</div>
+        </div>
+        <div class="kpi-card cinza">
+            <div class="kpi-valor">11.8m</div>
+            <div class="kpi-label">Maior comprimento</div>
+        </div>
+    </div>
+
+    <!-- CARGA 1 -->
+    <div class="carga-bloco">
+        <div class="carga-header">
+            <div class="ch-cell carga-numero">Carga #4821</div>
+            <div class="ch-cell carga-nome">ENTREGA CENTRO-OESTE — TRANSPORTADORA SILVA LTDA</div>
+            <div class="ch-cell carga-meta"><span class="lbl">SAÍDA</span> 23/06/2026</div>
+            <div class="ch-cell ch-badge"><span class="badge-contagem">5 itens</span></div>
+        </div>
+        <table class="carga-tabela">
+            <thead>
+                <tr>
+                    <th style="width:8%">Pedido</th>
+                    <th style="width:5%" class="col-c">Item</th>
+                    <th>Produto</th>
+                    <th style="width:18%">Cliente</th>
+                    <th style="width:14%">Vendedor</th>
+                    <th style="width:8%" class="col-c">Tipo</th>
+                    <th style="width:11%" class="col-num">Comprimento</th>
+                    <th style="width:9%" class="col-num">Excede em</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="pedido-num">102345</span></td>
+                    <td class="col-c">1</td>
+                    <td class="produto-cel">TELHA TR 40 EM AÇO ZINCADO 0,50MM</td>
+                    <td>CONSTRUTORA ALFA S.A.</td>
+                    <td>MARCOS OLIVEIRA</td>
+                    <td class="col-c"><span class="badge-tipo badge-telha">TELHA</span></td>
+                    <td class="col-comprimento">11.8m</td>
+                    <td class="col-excedente">+4.3m</td>
+                </tr>
+                <tr>
+                    <td><span class="pedido-num">102345</span></td>
+                    <td class="col-c">2</td>
+                    <td class="produto-cel">TELHA TR 40 EM AÇO ZINCADO 0,50MM</td>
+                    <td>CONSTRUTORA ALFA S.A.</td>
+                    <td>MARCOS OLIVEIRA</td>
+                    <td class="col-c"><span class="badge-tipo badge-telha">TELHA</span></td>
+                    <td class="col-comprimento">9.2m</td>
+                    <td class="col-excedente">+1.7m</td>
+                </tr>
+                <tr>
+                    <td><span class="pedido-num">102398</span></td>
+                    <td class="col-c">1</td>
+                    <td class="produto-cel">SBX PAINEL SANDUÍCHE EPS 50MM</td>
+                    <td>GALPÃO BETA CONSTRUÇÕES</td>
+                    <td>ANA SOUZA</td>
+                    <td class="col-c"><span class="badge-tipo badge-sbx">SBX</span></td>
+                    <td class="col-comprimento">8.5m</td>
+                    <td class="col-excedente">+2.5m</td>
+                </tr>
+                <tr>
+                    <td><span class="pedido-num">102412</span></td>
+                    <td class="col-c">3</td>
+                    <td class="produto-cel">TELHA ZIPADA EM AÇO GALVALUME 0,65MM</td>
+                    <td>INDUSTRIAL GAMA LTDA</td>
+                    <td>PEDRO FERREIRA</td>
+                    <td class="col-c"><span class="badge-tipo badge-telha">TELHA</span></td>
+                    <td class="col-comprimento">7.9m</td>
+                    <td class="col-excedente">+0.4m</td>
+                </tr>
+                <tr>
+                    <td><span class="pedido-num">102412</span></td>
+                    <td class="col-c">4</td>
+                    <td class="produto-cel">TELHA ZIPADA EM AÇO GALVALUME 0,65MM</td>
+                    <td>INDUSTRIAL GAMA LTDA</td>
+                    <td>PEDRO FERREIRA</td>
+                    <td class="col-c"><span class="badge-tipo badge-telha">TELHA</span></td>
+                    <td class="col-comprimento">8.1m</td>
+                    <td class="col-excedente">+0.6m</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- CARGA 2 -->
+    <div class="carga-bloco">
+        <div class="carga-header">
+            <div class="ch-cell carga-numero">Carga #4835</div>
+            <div class="ch-cell carga-nome">ROTA SUL — FRETE DIRETO</div>
+            <div class="ch-cell carga-meta"><span class="lbl">SAÍDA</span> 24/06/2026</div>
+            <div class="ch-cell ch-badge"><span class="badge-contagem">4 itens</span></div>
+        </div>
+        <table class="carga-tabela">
+            <thead>
+                <tr>
+                    <th style="width:8%">Pedido</th>
+                    <th style="width:5%" class="col-c">Item</th>
+                    <th>Produto</th>
+                    <th style="width:18%">Cliente</th>
+                    <th style="width:14%">Vendedor</th>
+                    <th style="width:8%" class="col-c">Tipo</th>
+                    <th style="width:11%" class="col-num">Comprimento</th>
+                    <th style="width:9%" class="col-num">Excede em</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="pedido-num">102501</span></td>
+                    <td class="col-c">1</td>
+                    <td class="produto-cel">SBX PAINEL SANDUÍCHE EPS 80MM</td>
+                    <td>FRIGORÍFICO DELTA S.A.</td>
+                    <td>CARLA MENDES</td>
+                    <td class="col-c"><span class="badge-tipo badge-sbx">SBX</span></td>
+                    <td class="col-comprimento">10.2m</td>
+                    <td class="col-excedente">+4.2m</td>
+                </tr>
+                <tr>
+                    <td><span class="pedido-num">102501</span></td>
+                    <td class="col-c">2</td>
+                    <td class="produto-cel">SBX PAINEL SANDUÍCHE EPS 80MM</td>
+                    <td>FRIGORÍFICO DELTA S.A.</td>
+                    <td>CARLA MENDES</td>
+                    <td class="col-c"><span class="badge-tipo badge-sbx">SBX</span></td>
+                    <td class="col-comprimento">9.8m</td>
+                    <td class="col-excedente">+3.8m</td>
+                </tr>
+                <tr>
+                    <td><span class="pedido-num">102533</span></td>
+                    <td class="col-c">1</td>
+                    <td class="produto-cel">TELHA TR 25 NATURAL 0,43MM</td>
+                    <td>ARMAZÉM ÉPSILON LTDA</td>
+                    <td>RODRIGO LIMA</td>
+                    <td class="col-c"><span class="badge-tipo badge-telha">TELHA</span></td>
+                    <td class="col-comprimento">8.0m</td>
+                    <td class="col-excedente">+0.5m</td>
+                </tr>
+                <tr>
+                    <td><span class="pedido-num">102533</span></td>
+                    <td class="col-c">2</td>
+                    <td class="produto-cel">TELHA TR 25 NATURAL 0,43MM</td>
+                    <td>ARMAZÉM ÉPSILON LTDA</td>
+                    <td>RODRIGO LIMA</td>
+                    <td class="col-c"><span class="badge-tipo badge-telha">TELHA</span></td>
+                    <td class="col-comprimento">7.6m</td>
+                    <td class="col-excedente">+0.1m</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- CARGA 3 -->
+    <div class="carga-bloco">
+        <div class="carga-header">
+            <div class="ch-cell carga-numero">Carga #4847</div>
+            <div class="ch-cell carga-nome">ENTREGA LOCAL RIBEIRÃO PRETO</div>
+            <div class="ch-cell ch-badge"><span class="badge-contagem">3 itens</span></div>
+        </div>
+        <table class="carga-tabela">
+            <thead>
+                <tr>
+                    <th style="width:8%">Pedido</th>
+                    <th style="width:5%" class="col-c">Item</th>
+                    <th>Produto</th>
+                    <th style="width:18%">Cliente</th>
+                    <th style="width:14%">Vendedor</th>
+                    <th style="width:8%" class="col-c">Tipo</th>
+                    <th style="width:11%" class="col-num">Comprimento</th>
+                    <th style="width:9%" class="col-num">Excede em</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="pedido-num">102610</span></td>
+                    <td class="col-c">1</td>
+                    <td class="produto-cel">TELHA TR 40 AÇO GALVALUME 0,50MM BRANCA</td>
+                    <td>DEPÓSITO ZETA</td>
+                    <td>MARCOS OLIVEIRA</td>
+                    <td class="col-c"><span class="badge-tipo badge-telha">TELHA</span></td>
+                    <td class="col-comprimento">8.8m</td>
+                    <td class="col-excedente">+1.3m</td>
+                </tr>
+                <tr>
+                    <td><span class="pedido-num">102610</span></td>
+                    <td class="col-c">2</td>
+                    <td class="produto-cel">TELHA TR 40 AÇO GALVALUME 0,50MM BRANCA</td>
+                    <td>DEPÓSITO ZETA</td>
+                    <td>MARCOS OLIVEIRA</td>
+                    <td class="col-c"><span class="badge-tipo badge-telha">TELHA</span></td>
+                    <td class="col-comprimento">8.3m</td>
+                    <td class="col-excedente">+0.8m</td>
+                </tr>
+                <tr>
+                    <td><span class="pedido-num">102655</span></td>
+                    <td class="col-c">1</td>
+                    <td class="produto-cel">SBX PAINEL SANDUÍCHE PIR 60MM</td>
+                    <td>CÂMARA FRIA ETA ALIMENTOS</td>
+                    <td>ANA SOUZA</td>
+                    <td class="col-c"><span class="badge-tipo badge-sbx">SBX</span></td>
+                    <td class="col-comprimento">7.2m</td>
+                    <td class="col-excedente">+1.2m</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- RODAPÉ PREVIEW -->
+<div class="rodape-preview">
+    <span>nexus</span>
+    <span>NOROAÇO · FERRO E AÇO</span>
+    <span>Página 1 de 1</span>
+</div>
+
+</div>
+
+
+
+</body>
+</html>

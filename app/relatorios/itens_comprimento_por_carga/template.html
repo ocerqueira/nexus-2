@@ -72,9 +72,10 @@
         background: var(--preto);
         border-bottom: 3px solid var(--amarelo);
         padding: 7px 12px;
+        border-radius: 3px 3px 0 0;
     }
-    .cab-marca { flex: 0 0 38%; white-space: nowrap; }
-    .cab-info  { flex: 1; text-align: right; }
+    .cab-info  { flex: 1; text-align: left; }
+    .cab-marca { flex: 0 0 auto; white-space: nowrap; text-align: right; }
 
     .wordmark {
         font-weight: 800;
@@ -104,6 +105,7 @@
         color: #FFFFFF;
         letter-spacing: 0.3px;
         line-height: 1.1;
+        text-transform: uppercase;
     }
     .doc-params {
         margin-top: 4px;
@@ -127,7 +129,7 @@
         display: table-cell;
         width: 33.33%;
         background: var(--preto);
-        border-radius: 5px;
+        border-radius: 3px;
         border-left: 4px solid var(--amarelo);
         padding: 11px 14px;
         vertical-align: middle;
@@ -155,7 +157,7 @@
     .carga-bloco {
         margin-bottom: 13px;
         border: 1px solid var(--cinza-claro);
-        border-radius: 5px;
+        border-radius: 3px;
         overflow: hidden;
         page-break-inside: avoid;
     }
@@ -279,18 +281,12 @@
 {% endblock %}
 
 
-{% block cabecalho %}
+{% block cabecalho %}{% endblock %}
+
+{% block conteudo %}
 {# Running element: retirado do fluxo pelo WeasyPrint, repetido em @top-center em toda página #}
 <div class="running-header">
     <div class="cab-wrap">
-        <div class="cab-marca">
-            {% if logo_b64 %}
-            <img src="{{ logo_b64 }}" style="height: 28px; max-width: 90px; object-fit: contain; vertical-align: middle; margin-right: 10px; filter: brightness(0) invert(1);">
-            {% else %}
-            <div class="wordmark"><span class="n">N</span>OROAÇO</div>
-            <div class="tagline">FERRO E AÇO</div>
-            {% endif %}
-        </div>
         <div class="cab-info">
             <div class="doc-titulo">{{ titulo }}</div>
             <div class="doc-params">
@@ -301,12 +297,16 @@
                 <span class="lbl">GERADO EM</span> {{ data_geracao }}
             </div>
         </div>
+        <div class="cab-marca">
+            {% if logo_b64 %}
+            <img src="{{ logo_b64 }}" style="height: 28px; max-width: 90px; object-fit: contain; vertical-align: middle; filter: brightness(0) invert(1);">
+            {% else %}
+            <div class="wordmark" style="text-align:right"><span class="n">N</span>OROAÇO</div>
+            <div class="tagline" style="text-align:right">FERRO E AÇO</div>
+            {% endif %}
+        </div>
     </div>
 </div>
-{% endblock %}
-
-
-{% block conteudo %}
 {% if total_itens == 0 %}
 <p class="sem-dados">Nenhum item com comprimento excedente encontrado{% if periodo is defined and periodo %} no período {{ periodo }}{% endif %}.</p>
 {% else %}
