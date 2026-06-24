@@ -67,12 +67,11 @@
     .cab-wrap {
         display: flex;
         align-items: center;
-        width: 297mm;       /* A4 landscape total */
-        margin-left: -11mm; /* cancela margem esquerda da página (1.1cm) */
+        width: 297mm;   /* A4 landscape — @top-center centraliza, ficando exato 0..297mm */
         box-sizing: border-box;
         background: var(--preto);
         border-bottom: 3px solid var(--amarelo);
-        padding: 7px 22px;  /* padding extra compensa as margens canceladas */
+        padding: 7px 12px;
     }
     .cab-marca { flex: 0 0 38%; white-space: nowrap; }
     .cab-info  { flex: 1; text-align: right; }
