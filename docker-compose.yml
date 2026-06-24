@@ -4,7 +4,7 @@ services:
     container_name: nexus-api
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8099:8099"
     env_file:
       - .env
     extra_hosts:
