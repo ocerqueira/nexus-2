@@ -4,7 +4,6 @@
     @page {
         size: 297mm 210mm;
         margin: 2.45cm 1.1cm 1.45cm 1.1cm;
-        border: 10px solid #2C2925;
         @top-left   { content: none; width: 0; }
         @top-right  { content: none; width: 0; }
         @top-center {
@@ -54,7 +53,7 @@
 
     /* ── Tipografia ────────────────────────────────────────────────── */
     body {
-        font-family: 'Gotham', 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
+        font-family: 'Gotham', 'Montserrat', 'Century Gothic', Arial, sans-serif;
         color: var(--preto);
         font-size: 9pt;
         hyphens: none;
@@ -328,9 +327,7 @@
             </div>
         </div>
         <div class="cab-marca">
-            {% if subtitulo %}
-            <div class="cab-unidade">{{ subtitulo }}</div>
-            {% endif %}
+            <div class="cab-unidade">{{ subtitulo or 'VOTUPORANGA' }}</div>
         </div>
     </div>
 </div>
