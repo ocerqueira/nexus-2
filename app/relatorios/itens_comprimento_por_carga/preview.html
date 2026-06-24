@@ -236,14 +236,44 @@
             font-weight: 800;
             letter-spacing: 0.5px;
         }
-        .badge-telha { background: var(--preto-2); color: #FFFFFF; }
-        .badge-sbx   { background: var(--amarelo); color: var(--preto); }
+        .badge-telha { background: var(--cinza-claro); color: var(--preto-2); }
+        .badge-sbx   { background: var(--cinza-claro); color: var(--preto-2); }
         .pedido-num  { font-weight: 800; color: var(--preto); }
+
+        .n-badge {
+            display: inline-block;
+            background: var(--amarelo);
+            color: var(--preto);
+            font-weight: 800;
+            font-size: 8pt;
+            padding: 1px 5px;
+            margin-right: 6px;
+            transform: skewX(-6deg);
+            vertical-align: middle;
+            line-height: 1.3;
+        }
+        .col-comprimento { text-align: right; font-weight: 800; color: var(--amarelo); white-space: nowrap; font-size: 9pt; }
+        .col-excedente   { text-align: right; font-size: 7.5pt; font-weight: 700; color: var(--laranja); white-space: nowrap; }
+
+        /* ── Cabeçalho slim (preview) ───────────────────────────────── */
+        .cab-slim {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            background: var(--preto);
+            border-bottom: 2px solid var(--amarelo);
+            padding: 4px 12px;
+            margin-top: 8px;
+        }
+        .cab-slim-titulo { flex: 1; font-size: 8pt; font-weight: 700; color: #FFFFFF; text-transform: uppercase; }
+        .cab-slim-params { font-size: 7pt; color: var(--cinza-claro); }
+        .cab-slim-params .lbl { color: var(--amarelo); font-weight: 700; }
 
         /* ── Rodapé preview ────────────────────────────────────────── */
         .rodape-preview {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             padding: 6px 12px;
             border-top: 1px solid var(--cinza-claro);
             margin-top: 16px;
@@ -294,10 +324,17 @@
         </div>
     </div>
 
+    <!-- CABEÇALHO SLIM (páginas 2+) — apenas para demonstração -->
+    <div class="cab-slim">
+        <div class="cab-slim-titulo">Itens com Comprimento Excedente por Carga</div>
+        <div class="cab-slim-params"><span class="lbl">PERÍODO</span> 21/06/2026 – 24/06/2026</div>
+    </div>
+    <p style="font-size:7pt;color:var(--cinza);padding:4px 12px 8px;font-style:italic">↑ Cabeçalho das páginas seguintes (slim)</p>
+
     <!-- CARGA 1 -->
     <div class="carga-bloco">
         <div class="carga-header">
-            <div class="ch-cell carga-numero">Carga #4821</div>
+            <div class="ch-cell carga-numero"><span class="n-badge">N</span>Carga #4821</div>
             <div class="ch-cell carga-nome">ENTREGA CENTRO-OESTE — TRANSPORTADORA SILVA LTDA</div>
             <div class="ch-cell carga-meta"><span class="lbl">SAÍDA</span> 23/06/2026</div>
             <div class="ch-cell ch-badge"><span class="badge-contagem">5 itens</span></div>
@@ -373,7 +410,7 @@
     <!-- CARGA 2 -->
     <div class="carga-bloco">
         <div class="carga-header">
-            <div class="ch-cell carga-numero">Carga #4835</div>
+            <div class="ch-cell carga-numero"><span class="n-badge">N</span>Carga #4835</div>
             <div class="ch-cell carga-nome">ROTA SUL — FRETE DIRETO</div>
             <div class="ch-cell carga-meta"><span class="lbl">SAÍDA</span> 24/06/2026</div>
             <div class="ch-cell ch-badge"><span class="badge-contagem">4 itens</span></div>
@@ -439,7 +476,7 @@
     <!-- CARGA 3 -->
     <div class="carga-bloco">
         <div class="carga-header">
-            <div class="ch-cell carga-numero">Carga #4847</div>
+            <div class="ch-cell carga-numero"><span class="n-badge">N</span>Carga #4847</div>
             <div class="ch-cell carga-nome">ENTREGA LOCAL RIBEIRÃO PRETO</div>
             <div class="ch-cell ch-badge"><span class="badge-contagem">3 itens</span></div>
         </div>
@@ -495,7 +532,10 @@
 <div class="rodape-preview">
     <span>nexus</span>
     <span>NOROAÇO · FERRO E AÇO</span>
-    <span>Página 1 de 1</span>
+    <span style="display:flex;align-items:center;gap:5px">
+        <span class="n-badge">N</span>
+        Página 1 de 1
+    </span>
 </div>
 
 </div>

@@ -15,14 +15,14 @@
         --fundo-th:     #F4F3F1;
     }
 
-    /* ── @page: paisagem + rodapé de marca (sobrescreve base.html) ─── */
+    /* ── @page base: cabeçalho slim nas páginas 2+ ─────────────────── */
     @page {
-        size: 297mm 210mm;  /* A4 landscape explícito — mais confiável que "A4 landscape" no WeasyPrint */
+        size: 297mm 210mm;
         margin: 2.45cm 1.1cm 1.45cm 1.1cm;
         @top-left   { content: none; width: 0; }
         @top-right  { content: none; width: 0; }
         @top-center {
-            content: element(cabecalho-running);
+            content: element(cabecalho-slim);
             vertical-align: bottom;
         }
         @bottom-left {
@@ -41,14 +41,20 @@
             color: var(--cinza-claro);
         }
         @bottom-right {
-            content: "Página " counter(page) " de " counter(pages);
-            font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
-            font-size: 8pt;
-            color: var(--preto-2);
+            content: element(rodape-direita);
+            vertical-align: middle;
         }
     }
 
-    /* ── Tipografia (sobrescreve base.html) ───────────────────────── */
+    /* ── @page :first: cabeçalho completo na primeira página ────────── */
+    @page :first {
+        @top-center {
+            content: element(cabecalho-completo);
+            vertical-align: bottom;
+        }
+    }
+
+    /* ── Tipografia ────────────────────────────────────────────────── */
     body {
         font-family: 'Futura', 'Century Gothic', 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
         color: var(--preto);
@@ -56,13 +62,24 @@
         -weasy-hyphens: none;
     }
 
-    /* Rodapé do base.html substituído pelo @page @bottom */
     .rodape { display: none; }
 
-    /* ── Running header ────────────────────────────────────────────── */
-    /* @top-center no WeasyPrint auto-dimensiona pelo conteúdo; usa largura
-       absoluta do A4 paisagem (297mm) menos as margens (1.1cm cada lado). */
-    .running-header { position: running(cabecalho-running); display: block; }
+    /* ── N badge — usado no cabeçalho de carga e no rodapé ─────────── */
+    .n-badge {
+        display: inline-block;
+        background: var(--amarelo);
+        color: var(--preto);
+        font-weight: 800;
+        font-size: 8pt;
+        padding: 1px 5px;
+        margin-right: 6px;
+        transform: skewX(-6deg);
+        vertical-align: middle;
+        line-height: 1.3;
+    }
+
+    /* ── Cabeçalho completo (página 1) ────────────────────────────── */
+    .running-header-completo { position: running(cabecalho-completo); display: block; }
 
     .cab-wrap {
         display: flex;
@@ -115,6 +132,42 @@
     }
     .doc-params .lbl { color: var(--amarelo); font-weight: 700; letter-spacing: 0.5px; }
     .doc-params .sep { color: var(--preto-2); padding: 0 5px; }
+
+    /* ── Cabeçalho slim (páginas 2+) ──────────────────────────────── */
+    .running-header-slim { position: running(cabecalho-slim); display: block; }
+
+    .cab-slim {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        box-sizing: border-box;
+        background: var(--preto);
+        border-bottom: 2px solid var(--amarelo);
+        padding: 4px 12px;
+    }
+    .cab-slim-titulo {
+        flex: 1;
+        font-size: 8pt;
+        font-weight: 700;
+        color: #FFFFFF;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .cab-slim-params {
+        font-size: 7pt;
+        color: var(--cinza-claro);
+        white-space: nowrap;
+    }
+    .cab-slim-params .lbl { color: var(--amarelo); font-weight: 700; }
+
+    /* ── Rodapé direito com N badge ────────────────────────────────── */
+    .running-footer { position: running(rodape-direita); display: flex; align-items: center; gap: 5px; }
+    .rodape-pagina::before {
+        content: "Página " counter(page) " de " counter(pages);
+        font-family: 'Futura', 'Century Gothic', 'Avenir Next', Arial, sans-serif;
+        font-size: 8pt;
+        color: var(--preto-2);
+    }
 
     /* ── KPIs ──────────────────────────────────────────────────────── */
     .kpi-faixa {
@@ -174,17 +227,6 @@
         color: var(--amarelo);
         white-space: nowrap;
         padding-right: 14px;
-    }
-    .carga-numero::before {
-        content: "N";
-        display: inline-block;
-        background: var(--amarelo);
-        color: var(--preto);
-        font-weight: 800;
-        font-size: 8pt;
-        padding: 0 4px;
-        margin-right: 7px;
-        transform: skewX(-6deg);
     }
     .carga-nome {
         width: 100%;
@@ -247,7 +289,7 @@
     .col-comprimento {
         text-align: right;
         font-weight: 800;
-        color: var(--laranja);
+        color: var(--amarelo);
         white-space: nowrap;
         font-size: 9pt;
     }
@@ -255,7 +297,7 @@
         text-align: right;
         font-size: 7.5pt;
         font-weight: 700;
-        color: var(--cinza);
+        color: var(--laranja);
         white-space: nowrap;
     }
     .produto-cel {
@@ -272,8 +314,9 @@
         font-weight: 800;
         letter-spacing: 0.5px;
     }
-    .badge-telha { background: var(--preto-2); color: #FFFFFF; }
-    .badge-sbx   { background: var(--amarelo); color: var(--preto); }
+    /* todos os tipos em cinza */
+    .badge-telha { background: var(--cinza-claro); color: var(--preto-2); }
+    .badge-sbx   { background: var(--cinza-claro); color: var(--preto-2); }
 
     .pedido-num { font-weight: 800; color: var(--preto); }
     .sem-dados  { color: var(--cinza); font-style: italic; text-align: center; padding: 60px 0; font-size: 10pt; }
@@ -284,8 +327,8 @@
 {% block cabecalho %}{% endblock %}
 
 {% block conteudo %}
-{# Running element: retirado do fluxo pelo WeasyPrint, repetido em @top-center em toda página #}
-<div class="running-header">
+{# Cabeçalho completo — página 1 #}
+<div class="running-header-completo">
     <div class="cab-wrap">
         <div class="cab-info">
             <div class="doc-titulo">{{ titulo }}</div>
@@ -307,6 +350,25 @@
         </div>
     </div>
 </div>
+
+{# Cabeçalho slim — páginas 2+ #}
+<div class="running-header-slim">
+    <div class="cab-slim">
+        <div class="cab-slim-titulo">{{ titulo }}</div>
+        <div class="cab-slim-params">
+            {% if periodo is defined and periodo %}
+            <span class="lbl">PERÍODO</span> {{ periodo }}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# Rodapé direito — N badge + página #}
+<div class="running-footer">
+    <span class="n-badge">N</span>
+    <span class="rodape-pagina"></span>
+</div>
+
 {% if total_itens == 0 %}
 <p class="sem-dados">Nenhum item com comprimento excedente encontrado{% if periodo is defined and periodo %} no período {{ periodo }}{% endif %}.</p>
 {% else %}
@@ -329,7 +391,7 @@
 {% for carga in cargas %}
 <div class="carga-bloco">
     <div class="carga-header">
-        <div class="ch-cell carga-numero">Carga #{{ carga.nrocarga }}</div>
+        <div class="ch-cell carga-numero"><span class="n-badge">N</span>Carga #{{ carga.nrocarga }}</div>
         <div class="ch-cell carga-nome">{{ carga.nome_carga or '—' }}</div>
         {% if carga.dt_saida %}
         <div class="ch-cell carga-meta"><span class="lbl">SAÍDA</span> {{ carga.dt_saida }}</div>
