@@ -348,8 +348,10 @@ def orquestrar_relatorio(
         # Uma execução → N envios
         processador = processador_classe()
         dados = processador.buscar_dados(parametros)
-        pdf_bytes = _gerar_e_comprimir(nome_relatorio, dados, titulo, subtitulo, comprimir_pdf)
         resumo = dados.get("resumo", "")
+        # Só gera PDF se algum destinatário usa email (WP busca via endpoint)
+        precisa_pdf = any("email" in (d.get("canais") or []) for d in todos_dests)
+        pdf_bytes = _gerar_e_comprimir(nome_relatorio, dados, titulo, subtitulo, comprimir_pdf) if precisa_pdf else None
 
         for dest in todos_dests:
             despachos_criados.extend(_despachar_relatorio(
@@ -361,12 +363,13 @@ def orquestrar_relatorio(
         for dest in todos_dests:
             filtro = dest.get("filtro_parametros") or {}
             params_dest = {**parametros, **filtro}
+            precisa_pdf = "email" in (dest.get("canais") or [])
 
             try:
                 processador = processador_classe()
                 dados = processador.buscar_dados(params_dest)
-                pdf_bytes = _gerar_e_comprimir(nome_relatorio, dados, titulo, subtitulo, comprimir_pdf)
                 resumo = dados.get("resumo", "")
+                pdf_bytes = _gerar_e_comprimir(nome_relatorio, dados, titulo, subtitulo, comprimir_pdf) if precisa_pdf else None
             except Exception as e:
                 logger.error(f"Erro ao gerar relatório para {dest.get('nome')}: {e}")
                 continue
@@ -403,7 +406,7 @@ def _despachar_relatorio(
     historico_id: int | None,
     relatorio_id: int,
     dest: dict,
-    pdf_bytes: bytes,
+    pdf_bytes: bytes | None,
     resumo: str,
 ) -> list[dict]:
     """Cria despachos para todos os canais de um destinatário."""
@@ -418,14 +421,17 @@ def _despachar_relatorio(
             if fmt == "resumo_texto":
                 payload = {"mensagem": resumo or "Relatório gerado. Sem resumo disponível."}
             else:
+                # N8N busca o PDF via GET /relatorios/{nome}/solicitar?formato=pdf
                 payload = {
-                    "documento_base64": base64.b64encode(pdf_bytes).decode(),
-                    "mimetype": "application/pdf",
+                    "tipo": "pdf",
                     "text": resumo or "Documento",
                 }
             destino = dest.get("whatsapp_numero") or ""
 
         elif canal == "email":
+            if not pdf_bytes:
+                logger.warning(f"Email para {dest.get('nome')} ignorado: PDF não gerado")
+                continue
             payload = {
                 "assunto": f"Relatório: {dest.get('nome', 'N/D')}",
                 "pdf_base64": base64.b64encode(pdf_bytes).decode(),

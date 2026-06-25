@@ -165,6 +165,18 @@
 
     {
       "parameters": {
+        "jsCode": "// Busca PDF do Nexus (formato=pdf) e prepara payload para sendMedia.\n// Fallback: se despacho ainda tiver documento_base64 legado, usa direto.\nconst despacho = $input.first().json;\nconst payload = despacho._payload || {};\nlet mediaBase64, mediaText, mediaFileName;\n\nif (payload.documento_base64) {\n  // Legado: base64 já no payload\n  const mime = payload.mimetype || 'application/pdf';\n  mediaBase64 = `data:${mime};base64,${payload.documento_base64}`;\n  mediaText = payload.text || payload.caption || 'Documento';\n  mediaFileName = (despacho.relatorio_nome || despacho.alerta_nome || 'nexus') + '.pdf';\n} else {\n  // Novo: busca PDF via endpoint Nexus\n  const config = $('⚙️ Config (Edite aqui)').first().json;\n  const nome = despacho.relatorio_nome;\n  if (!nome) throw new Error(`Despacho ${despacho.id}: relatorio_nome ausente para PDF`);\n\n  const resp = await fetch(\n    `${config.NEXUS_URL}/relatorios/${nome}/solicitar?formato=pdf`,\n    {\n      method: 'POST',\n      headers: { 'X-API-Key': config.NEXUS_API_KEY, 'Content-Type': 'application/json' },\n      body: '{}'\n    }\n  );\n  if (!resp.ok) {\n    const err = await resp.text();\n    throw new Error(`Nexus PDF ${resp.status}: ${err.slice(0, 200)}`);\n  }\n  const buf = await resp.arrayBuffer();\n  mediaBase64 = `data:application/pdf;base64,${Buffer.from(buf).toString('base64')}`;\n  mediaText = payload.text || 'Documento';\n  mediaFileName = nome + '.pdf';\n}\n\nreturn [{\n  json: { ...despacho, _media_base64: mediaBase64, _media_text: mediaText, _media_filename: mediaFileName },\n  pairedItem: { item: 0 }\n}];"
+      },
+      "id": "code-buscar-pdf",
+      "name": "Code — buscar PDF Nexus",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 260],
+      "continueOnFail": true
+    },
+
+    {
+      "parameters": {
         "method": "POST",
         "url": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_URL + '/message/sendMedia/' + $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_INSTANCE }}",
         "sendHeaders": true,
@@ -175,14 +187,14 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $json.destino, mediatype: 'document', mimetype: $json._payload.mimetype || 'application/pdf', text: $json._payload.text || $json._payload.caption || 'Documento', media: 'data:' + ($json._payload.mimetype || 'application/pdf') + ';base64,' + $json._payload.documento_base64, fileName: ($json.relatorio_nome || $json.alerta_nome || 'nexus') + '.pdf' }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $json.destino, mediatype: 'document', mimetype: 'application/pdf', text: $json._media_text || 'Documento', media: $json._media_base64, fileName: $json._media_filename || 'relatorio.pdf' }) }}",
         "options": { "allowUnauthorizedCerts": true }
       },
       "id": "evo-sendmedia",
       "name": "Evolution — sendMedia",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2000, 260],
+      "position": [2250, 260],
       "continueOnFail": true
     },
 
@@ -305,9 +317,12 @@
     },
     "Switch — WhatsApp tipo": {
       "main": [
-        [{ "node": "Evolution — sendText",  "type": "main", "index": 0 }],
-        [{ "node": "Evolution — sendMedia", "type": "main", "index": 0 }]
+        [{ "node": "Evolution — sendText",      "type": "main", "index": 0 }],
+        [{ "node": "Code — buscar PDF Nexus",   "type": "main", "index": 0 }]
       ]
+    },
+    "Code — buscar PDF Nexus": {
+      "main": [[{ "node": "Evolution — sendMedia", "type": "main", "index": 0 }]]
     },
     "Evolution — sendText": {
       "main": [[{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]]
