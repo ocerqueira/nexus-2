@@ -113,7 +113,7 @@
 
     {
       "parameters": {
-        "jsCode": "// Decide se é texto simples ou documento (PDF/imagem)\nconst despacho = $input.first().json;\nconst payload = typeof despacho.payload === 'string'\n  ? JSON.parse(despacho.payload)\n  : despacho.payload;\n\nconst tipo = payload.documento_base64 ? 'media' : 'texto';\n\nreturn [{\n  json: {\n    ...despacho,\n    _payload: payload,\n    _tipo_wp: tipo\n  }\n}];"
+        "jsCode": "// Decide se é texto simples ou documento (PDF/imagem)\nconst despacho = $input.first().json;\nconst payload = typeof despacho.payload === 'string'\n  ? JSON.parse(despacho.payload)\n  : despacho.payload;\n\nconst tipo = payload.documento_base64 ? 'media' : 'texto';\n\nreturn [{\n  json: {\n    ...despacho,\n    _payload: payload,\n    _tipo_wp: tipo\n  },\n  pairedItem: { item: 0 }\n}];"
       },
       "id": "code-wp-tipo",
       "name": "Code — tipo WhatsApp",
@@ -188,7 +188,7 @@
 
     {
       "parameters": {
-        "jsCode": "// Prepara email: suporta HTML puro ou PDF em anexo\nconst despacho = $input.first().json;\nconst payload = typeof despacho.payload === 'string'\n  ? JSON.parse(despacho.payload)\n  : despacho.payload;\n\nreturn [{\n  json: {\n    ...despacho,\n    _payload: payload,\n    _tem_pdf: !!payload.pdf_base64\n  }\n}];"
+        "jsCode": "// Prepara email: suporta HTML puro ou PDF em anexo\nconst despacho = $input.first().json;\nconst payload = typeof despacho.payload === 'string'\n  ? JSON.parse(despacho.payload)\n  : despacho.payload;\n\nreturn [{\n  json: {\n    ...despacho,\n    _payload: payload,\n    _tem_pdf: !!payload.pdf_base64\n  },\n  pairedItem: { item: 0 }\n}];"
       },
       "id": "code-email",
       "name": "Code — preparar email",
