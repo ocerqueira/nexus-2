@@ -175,7 +175,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ ({ number: $json.destino, mediatype: 'document', mimetype: $json._payload.mimetype || 'application/pdf', text: $json._payload.caption || $json._payload.text || '', media: $json._payload.documento_base64, fileName: ($json.relatorio_nome || $json.alerta_nome || 'nexus') + '.pdf' }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $json.destino, mediatype: 'document', mimetype: $json._payload.mimetype || 'application/pdf', caption: $json._payload.caption || $json._payload.text || 'Documento', media: 'data:' + ($json._payload.mimetype || 'application/pdf') + ';base64,' + $json._payload.documento_base64, fileName: ($json.relatorio_nome || $json.alerta_nome || 'nexus') + '.pdf' }) }}",
         "options": { "allowUnauthorizedCerts": true }
       },
       "id": "evo-sendmedia",
