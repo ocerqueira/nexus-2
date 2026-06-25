@@ -34,7 +34,7 @@
         "options": {}
       },
       "id": "config",
-      "name": "⚙️ Config (Edite aqui)",
+      "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [250, 300]
@@ -145,11 +145,11 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_URL + '/message/sendText/' + $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_INSTANCE }}",
+        "url": "={{ $('Config').first().json.EVOLUTION_URL + '/message/sendText/' + $('Config').first().json.EVOLUTION_INSTANCE }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_API_KEY }}" }
+            { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" }
           ]
         },
         "sendBody": true,
@@ -167,7 +167,7 @@
 
     {
       "parameters": {
-        "jsCode": "// Busca PDF do Nexus (formato=pdf) e prepara payload para sendMedia.\n// Fallback: se despacho ainda tiver documento_base64 legado, usa direto.\nconst despacho = $input.first().json;\nconst payload = despacho._payload || {};\nlet mediaBase64, mediaText, mediaFileName;\n\nif (payload.documento_base64) {\n  // Legado: base64 já no payload\n  const mime = payload.mimetype || 'application/pdf';\n  mediaBase64 = `data:${mime};base64,${payload.documento_base64}`;\n  mediaText = payload.text || payload.caption || 'Documento';\n  mediaFileName = (despacho.relatorio_nome || despacho.alerta_nome || 'nexus') + '.pdf';\n} else {\n  // Novo: busca PDF via endpoint Nexus\n  const config = $('⚙️ Config (Edite aqui)').first().json;\n  const nome = despacho.relatorio_nome;\n  if (!nome) throw new Error(`Despacho ${despacho.id}: relatorio_nome ausente para PDF`);\n\n  const resp = await fetch(\n    `${config.NEXUS_URL}/relatorios/${nome}/solicitar?formato=pdf`,\n    {\n      method: 'POST',\n      headers: { 'X-API-Key': config.NEXUS_API_KEY, 'Content-Type': 'application/json' },\n      body: '{}'\n    }\n  );\n  if (!resp.ok) {\n    const err = await resp.text();\n    throw new Error(`Nexus PDF ${resp.status}: ${err.slice(0, 200)}`);\n  }\n  const buf = await resp.arrayBuffer();\n  mediaBase64 = `data:application/pdf;base64,${Buffer.from(buf).toString('base64')}`;\n  mediaText = payload.text || 'Documento';\n  mediaFileName = nome + '.pdf';\n}\n\nreturn [{\n  json: { ...despacho, _media_base64: mediaBase64, _media_text: mediaText, _media_filename: mediaFileName },\n  pairedItem: { item: 0 }\n}];"
+        "jsCode": "// Busca PDF do Nexus (formato=pdf) e prepara payload para sendMedia.\n// Fallback: se despacho ainda tiver documento_base64 legado, usa direto.\nconst despacho = $input.first().json;\nconst payload = despacho._payload || {};\nlet mediaBase64, mediaText, mediaFileName;\n\nif (payload.documento_base64) {\n  // Legado: base64 já no payload\n  const mime = payload.mimetype || 'application/pdf';\n  mediaBase64 = `data:${mime};base64,${payload.documento_base64}`;\n  mediaText = payload.text || payload.caption || 'Documento';\n  mediaFileName = (despacho.relatorio_nome || despacho.alerta_nome || 'nexus') + '.pdf';\n} else {\n  // Novo: busca PDF via endpoint Nexus\n  const config = $('Config').first().json;\n  const nome = despacho.relatorio_nome;\n  if (!nome) throw new Error(`Despacho ${despacho.id}: relatorio_nome ausente para PDF`);\n\n  const resp = await fetch(\n    `${config.NEXUS_URL}/relatorios/${nome}/solicitar?formato=pdf`,\n    {\n      method: 'POST',\n      headers: { 'X-API-Key': config.NEXUS_API_KEY, 'Content-Type': 'application/json' },\n      body: '{}'\n    }\n  );\n  if (!resp.ok) {\n    const err = await resp.text();\n    throw new Error(`Nexus PDF ${resp.status}: ${err.slice(0, 200)}`);\n  }\n  const buf = await resp.arrayBuffer();\n  mediaBase64 = `data:application/pdf;base64,${Buffer.from(buf).toString('base64')}`;\n  mediaText = payload.text || 'Documento';\n  mediaFileName = nome + '.pdf';\n}\n\nreturn [{\n  json: { ...despacho, _media_base64: mediaBase64, _media_text: mediaText, _media_filename: mediaFileName },\n  pairedItem: { item: 0 }\n}];"
       },
       "id": "code-buscar-pdf",
       "name": "Code — buscar PDF Nexus",
@@ -180,11 +180,11 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_URL + '/message/sendMedia/' + $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_INSTANCE }}",
+        "url": "={{ $('Config').first().json.EVOLUTION_URL + '/message/sendMedia/' + $('Config').first().json.EVOLUTION_INSTANCE }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_API_KEY }}" }
+            { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" }
           ]
         },
         "sendBody": true,
@@ -213,15 +213,15 @@
 
     {
       "parameters": {
-        "fromEmail": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_FROM_NAME + ' <' + $('⚙️ Config (Edite aqui)').first().json.SMTP_USER + '>' }}",
+        "fromEmail": "={{ $('Config').first().json.SMTP_FROM_NAME + ' <' + $('Config').first().json.SMTP_USER + '>' }}",
         "toEmail": "={{ $json.destino }}",
         "subject": "={{ $json._payload.assunto || ('Nexus: ' + ($json.alerta_nome || $json.relatorio_nome || 'Notificação')) }}",
         "html": "={{ $json._payload.html || ('<p>' + ($json._payload.resumo || '') + '</p>') }}",
         "options": {
-          "host": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_HOST }}",
-          "port": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_PORT }}",
-          "user": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_USER }}",
-          "password": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_PASSWORD }}",
+          "host": "={{ $('Config').first().json.SMTP_HOST }}",
+          "port": "={{ $('Config').first().json.SMTP_PORT }}",
+          "user": "={{ $('Config').first().json.SMTP_USER }}",
+          "password": "={{ $('Config').first().json.SMTP_PASSWORD }}",
           "ssl": false,
           "attachments": "={{ $json._tem_pdf ? JSON.stringify([{ fileName: ($json.relatorio_nome || 'relatorio') + '.pdf', data: $json._payload.pdf_base64, mimeType: 'application/pdf' }]) : '[]' }}"
         }
@@ -269,11 +269,11 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $('⚙️ Config (Edite aqui)').first().json.NEXUS_URL + '/despachos/' + $json.despacho_id + '/status' }}",
+        "url": "={{ $('Config').first().json.NEXUS_URL + '/despachos/' + $json.despacho_id + '/status' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-API-Key",    "value": "={{ $('⚙️ Config (Edite aqui)').first().json.NEXUS_API_KEY }}" },
+            { "name": "X-API-Key",    "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
@@ -292,9 +292,9 @@
 
   "connections": {
     "Cron — a cada minuto": {
-      "main": [[{ "node": "⚙️ Config (Edite aqui)", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
     },
-    "⚙️ Config (Edite aqui)": {
+    "Config": {
       "main": [[{ "node": "GET — despachos/pendentes", "type": "main", "index": 0 }]]
     },
     "GET — despachos/pendentes": {
