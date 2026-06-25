@@ -175,7 +175,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $json.destino, mediatype: 'document', mimetype: $json._payload.mimetype || 'application/pdf', caption: $json._payload.caption || '', media: $json._payload.documento_base64, fileName: ($json.relatorio_nome || $json.alerta_nome || 'nexus') + '.pdf' }) }}",
+        "jsonBody": "={{ ({ number: $json.destino, mediatype: 'document', mimetype: $json._payload.mimetype || 'application/pdf', caption: $json._payload.caption || '', media: $json._payload.documento_base64, fileName: ($json.relatorio_nome || $json.alerta_nome || 'nexus') + '.pdf' }) }}",
         "options": {}
       },
       "id": "evo-sendmedia",
@@ -222,7 +222,7 @@
 
     {
       "parameters": {
-        "jsCode": "// Coleta resultado de qualquer canal e determina status\nconst item = $input.first();\n\n// ID do despacho: vem do Split original (HTTP response sobrescreve item.json)\nlet despachoId = null;\ntry {\n  despachoId = $('Split Out — despachos').item.json.id;\n} catch(e) {\n  despachoId = item.json.id || null;\n}\n\n// Se N8N guardou resposta como binary (ex: Evolution retornou PDF/mídia),\n// isso significa que o envio foi bem-sucedido — não é erro.\nconst temBinary = item.binary && Object.keys(item.binary).length > 0;\n\nconst temErro = !temBinary && (!!item.json.error || !!item.error);\nconst statusCode = item.json.statusCode || 200;\nconst erroMsg = temErro\n  ? (item.json.error?.message || JSON.stringify(item.json.error || 'erro desconhecido'))\n  : (!temBinary && statusCode >= 400 ? `HTTP ${statusCode}` : null);\n\nconst sucesso = temBinary || (!temErro && statusCode < 400);\n\n// tentativas vem do despacho original\nconst tentativasAnterior = $('Split Out — despachos').item.json.tentativas || 0;\n\nreturn [{\n  json: {\n    despacho_id: despachoId,\n    status:      sucesso ? 'enviado' : 'falhou',\n    erro:        erroMsg || null,\n    tentativas:  tentativasAnterior + 1\n  }\n}];"
+        "jsCode": "// Coleta resultado de qualquer canal e determina status\nconst item = $input.first();\n\n// Tenta recuperar o despacho original pela cadeia de pairedItem.\n// Tenta o Code node mais próximo que tem os campos (menor cadeia = menos falha).\n// Email path: Code — preparar email; WP path: Code — tipo WhatsApp.\nlet despachoOriginal = null;\ntry {\n  despachoOriginal = $('Code — tipo WhatsApp').item.json;\n} catch(e1) {\n  try {\n    despachoOriginal = $('Code — preparar email').item.json;\n  } catch(e2) {\n    despachoOriginal = null;\n  }\n}\n\nconst despachoId = despachoOriginal?.id ?? null;\nconst tentativasAnterior = despachoOriginal?.tentativas ?? 0;\n\n// Resposta binary = Evolution enviou mídia com sucesso\nconst temBinary = item.binary && Object.keys(item.binary).length > 0;\n\nconst temErro = !temBinary && (!!item.json?.error || !!item.error);\nconst statusCode = item.json?.statusCode || 200;\nconst erroMsg = temErro\n  ? (item.json?.error?.message || JSON.stringify(item.json?.error || 'erro desconhecido'))\n  : (!temBinary && statusCode >= 400 ? `HTTP ${statusCode}` : null);\n\nconst sucesso = temBinary || (!temErro && statusCode < 400);\n\nreturn [{\n  json: {\n    despacho_id: despachoId,\n    status:      sucesso ? 'enviado' : 'falhou',\n    erro:        erroMsg || null,\n    tentativas:  tentativasAnterior + 1\n  }\n}];"
       },
       "id": "code-resultado",
       "name": "Code — avaliar resultado",
