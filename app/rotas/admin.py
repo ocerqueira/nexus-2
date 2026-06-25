@@ -324,7 +324,7 @@ def admin_relatorios_destinatarios(request: Request, relatorio_id: int):
 def admin_relatorios_dest_add(
     request: Request, relatorio_id: int,
     usuario_id: Annotated[int, Form()],
-    canais: Annotated[list[str], Form()] = Form(default=[]),
+    canais: Annotated[list[str], Form()] = [],
     formato_whatsapp: Annotated[str, Form()] = "documento",
     filtro_parametros_json: Annotated[str | None, Form()] = None,
 ):
@@ -625,7 +625,7 @@ def admin_alertas_destinatarios(request: Request, alerta_id: int):
 def admin_alertas_dest_add(
     request: Request, alerta_id: int,
     usuario_id: Annotated[int, Form()],
-    canais: Annotated[list[str], Form()] = Form(default=[]),
+    canais: Annotated[list[str], Form()] = [],
     modo_mensagem: Annotated[str, Form()] = "individual",
     limite_hora: Annotated[int | None, Form()] = None,
     limite_dia: Annotated[int | None, Form()] = None,
@@ -1228,7 +1228,7 @@ def admin_agendamentos_destinatarios(request: Request, agendamento_id: int):
 def admin_agendamentos_dest_add(
     request: Request, agendamento_id: int,
     usuario_id: Annotated[int, Form()],
-    canais: Annotated[list[str], Form()] = Form(default=[]),
+    canais: Annotated[list[str], Form()] = [],
 ):
     canais_validos = [ch for ch in canais if ch in ("whatsapp", "email", "sms")]
     try:
