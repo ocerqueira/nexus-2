@@ -421,7 +421,7 @@ def _despachar_relatorio(
                 payload = {
                     "documento_base64": base64.b64encode(pdf_bytes).decode(),
                     "mimetype": "application/pdf",
-                    "caption": resumo or "",
+                    "text": resumo or "Documento",
                 }
             destino = dest.get("whatsapp_numero") or ""
 
