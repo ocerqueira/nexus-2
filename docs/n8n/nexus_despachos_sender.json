@@ -153,7 +153,7 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ number: $json.destino, text: $json._payload.mensagem }) }}",
-        "options": { "allowUnauthorizedCerts": false }
+        "options": { "allowUnauthorizedCerts": true }
       },
       "id": "evo-sendtext",
       "name": "Evolution — sendText",
@@ -176,7 +176,7 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ ({ number: $json.destino, mediatype: 'document', mimetype: $json._payload.mimetype || 'application/pdf', caption: $json._payload.caption || '', media: $json._payload.documento_base64, fileName: ($json.relatorio_nome || $json.alerta_nome || 'nexus') + '.pdf' }) }}",
-        "options": {}
+        "options": { "allowUnauthorizedCerts": true }
       },
       "id": "evo-sendmedia",
       "name": "Evolution — sendMedia",
