@@ -94,26 +94,27 @@
 
     {
       "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.canal }}",
         "rules": {
-          "values": [
-            { "value": "whatsapp", "output": 0 },
-            { "value": "email",    "output": 1 },
-            { "value": "sms",      "output": 2 }
+          "rules": [
+            { "value2": "whatsapp" },
+            { "value2": "email" },
+            { "value2": "sms" }
           ]
         },
-        "dataType": "string",
-        "value1": "={{ $json.canal }}"
+        "fallbackOutput": "none"
       },
       "id": "switch-canal",
       "name": "Switch — canal",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.2,
+      "typeVersion": 1,
       "position": [1250, 300]
     },
 
     {
       "parameters": {
-        "jsCode": "// Decide se é texto simples ou documento (PDF/imagem)\nconst despacho = $input.first().json;\nconst payload = typeof despacho.payload === 'string'\n  ? JSON.parse(despacho.payload)\n  : despacho.payload;\n\nconst tipo = payload.documento_base64 ? 'media' : 'texto';\n\nreturn [{\n  json: {\n    ...despacho,\n    _payload: payload,\n    _tipo_wp: tipo\n  },\n  pairedItem: { item: 0 }\n}];"
+        "jsCode": "// Decide se é texto simples ou documento (PDF)\nconst despacho = $input.first().json;\nconst payload = typeof despacho.payload === 'string'\n  ? JSON.parse(despacho.payload)\n  : despacho.payload;\n\n// media: base64 legado OU novo tipo=pdf\nconst tipo = (payload.documento_base64 || payload.tipo === 'pdf') ? 'media' : 'texto';\n\nreturn [{\n  json: { ...despacho, _payload: payload, _tipo_wp: tipo },\n  pairedItem: { item: 0 }\n}];"
       },
       "id": "code-wp-tipo",
       "name": "Code — tipo WhatsApp",
@@ -124,19 +125,20 @@
 
     {
       "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json._tipo_wp }}",
         "rules": {
-          "values": [
-            { "value": "texto", "output": 0 },
-            { "value": "media", "output": 1 }
+          "rules": [
+            { "value2": "texto" },
+            { "value2": "media" }
           ]
         },
-        "dataType": "string",
-        "value1": "={{ $json._tipo_wp }}"
+        "fallbackOutput": "none"
       },
       "id": "switch-wp-tipo",
       "name": "Switch — WhatsApp tipo",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.2,
+      "typeVersion": 1,
       "position": [1750, 160]
     },
 
