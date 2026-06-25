@@ -1,14 +1,18 @@
 """
 Renderizador de mensagens de alertas.
-Renderiza templates Jinja2 (.txt e .html) por canal.
+Renderiza templates Jinja2 por canal e modo.
 
-Convenção dos arquivos:
-  whatsapp_consolidado.txt        → corpo WhatsApp agrupado
-  whatsapp_individual.txt         → corpo WhatsApp por linha
-  email_consolidado_assunto.txt   → assunto email agrupado
-  email_consolidado_html.html     → corpo HTML email agrupado
-  email_individual_assunto.txt    → assunto email por linha
-  email_individual_html.html      → corpo HTML email por linha
+Convenção de arquivos em alertas/{nome}/mensagens/:
+  whatsapp_individual.txt         → WhatsApp, 1 despacho por item
+  whatsapp_consolidado.txt        → WhatsApp, todos os itens agrupados
+  email_individual_assunto.txt    → Email individual: linha de assunto
+  email_individual_html.html      → Email individual: corpo HTML
+  email_consolidado_assunto.txt   → Email agrupado: linha de assunto
+  email_consolidado_html.html     → Email agrupado: corpo HTML
+  sms_individual.txt              → SMS individual (futuro)
+
+API canônica: renderizar_despacho(nome_alerta, canal, modo, contexto)
+Retorna dict com payload pronto para inserir em despachos.payload.
 """
 
 import logging
@@ -22,197 +26,176 @@ logger = logging.getLogger(__name__)
 
 PASTA_ALERTAS = Path(__file__).resolve().parent.parent / "alertas"
 
-
-# Tipos de mensagem que o sistema pode renderizar
-ARQUIVOS_POR_TIPO = {
-    "whatsapp_consolidado": ("whatsapp_consolidado.txt", False),
-    "whatsapp_individual": ("whatsapp_individual.txt", False),
-    "email_consolidado_assunto": ("email_consolidado_assunto.txt", False),
-    "email_consolidado_html": ("email_consolidado_html.html", True),
-    "email_individual_assunto": ("email_individual_assunto.txt", False),
-    "email_individual_html": ("email_individual_html.html", True),
+# Mapeamento (canal, modo) → arquivos de template
+# Valor: lista de (nome_arquivo, é_html, chave_no_payload)
+_TEMPLATES: dict[tuple[str, str], list[tuple[str, bool, str]]] = {
+    ("whatsapp", "individual"): [
+        ("whatsapp_individual.txt", False, "mensagem"),
+    ],
+    ("whatsapp", "agrupado"): [
+        ("whatsapp_consolidado.txt", False, "mensagem"),
+    ],
+    ("email", "individual"): [
+        ("email_individual_assunto.txt", False, "assunto"),
+        ("email_individual_html.html",   True,  "html"),
+    ],
+    ("email", "agrupado"): [
+        ("email_consolidado_assunto.txt", False, "assunto"),
+        ("email_consolidado_html.html",   True,  "html"),
+    ],
+    ("sms", "individual"): [
+        ("sms_individual.txt", False, "texto"),
+    ],
+    ("sms", "agrupado"): [
+        ("sms_individual.txt", False, "texto"),
+    ],
 }
 
 
-def _criar_ambiente_jinja(pasta_mensagens: Path, autoescape: bool) -> Environment:
-    """Cria ambiente Jinja2 para a pasta de mensagens do alerta."""
+def _criar_ambiente_jinja(pasta: Path, autoescape: bool) -> Environment:
     return Environment(
-        loader=FileSystemLoader(str(pasta_mensagens)),
+        loader=FileSystemLoader(str(pasta)),
         autoescape=select_autoescape(["html"]) if autoescape else False,
         trim_blocks=True,
         lstrip_blocks=True,
     )
 
 
-def _renderizar_arquivo(
-    pasta_mensagens: Path,
-    nome_arquivo: str,
-    autoescape: bool,
-    contexto: dict,
-) -> str | None:
-    """
-    Renderiza um arquivo específico.
-    Retorna None se o arquivo não existir.
-    """
-    arquivo = pasta_mensagens / nome_arquivo
-
-    if not arquivo.exists():
+def _renderizar_arquivo(pasta: Path, nome: str, autoescape: bool, contexto: dict) -> str | None:
+    if not (pasta / nome).exists():
         return None
-
-    ambiente = _criar_ambiente_jinja(pasta_mensagens, autoescape)
-
     try:
-        template = ambiente.get_template(nome_arquivo)
-        return template.render(**contexto).strip()
+        env = _criar_ambiente_jinja(pasta, autoescape)
+        return env.get_template(nome).render(**contexto).strip()
     except TemplateNotFound:
         return None
 
 
-def renderizar_mensagens_consolidadas(
+def _contexto_base(contexto: dict) -> dict:
+    return {**contexto, "data_geracao": datetime.now().strftime("%d/%m/%Y às %H:%M")}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# API CANÔNICA
+# ─────────────────────────────────────────────────────────────────────────────
+
+def renderizar_despacho(
     nome_alerta: str,
+    canal: str,
+    modo: str,
     contexto: dict,
-) -> dict[str, str]:
+    linha: dict | None = None,
+) -> dict | None:
     """
-    Renderiza todas as mensagens consolidadas disponíveis para um alerta.
+    Renderiza payload para um despacho específico.
 
     Args:
         nome_alerta: Nome técnico do alerta (pasta em app/alertas/)
-        contexto: Dict com dados para o template (total, dados, titulo, etc)
+        canal:       'whatsapp' | 'email' | 'sms'
+        modo:        'individual' (por item) | 'agrupado' (todos os itens)
+        contexto:    Dados gerais do alerta (titulo, severidade, dados, resumo, etc.)
+        linha:       Dados de UM item específico (apenas para modo='individual')
 
     Returns:
-        Dict com as mensagens renderizadas. Chaves possíveis:
-        - whatsapp
-        - email_assunto
-        - email_html
-
-        Se um template não existir, a chave correspondente não aparece.
+        Dict com payload renderizado pronto para despachos.payload:
+          whatsapp → {"mensagem": "..."}
+          email    → {"assunto": "...", "html": "..."}
+          sms      → {"texto": "..."}
+        None se nenhum template existe para este canal+modo.
     """
-    pasta_mensagens = PASTA_ALERTAS / nome_alerta / "mensagens"
+    pasta = PASTA_ALERTAS / nome_alerta / "mensagens"
+    if not pasta.exists():
+        logger.warning(f"Pasta mensagens inexistente: {pasta}")
+        return None
 
-    if not pasta_mensagens.exists():
-        logger.warning(f"Pasta de mensagens não existe: {pasta_mensagens}")
-        return {}
+    specs = _TEMPLATES.get((canal, modo))
+    if not specs:
+        logger.warning(f"Canal+modo não suportado: ({canal}, {modo})")
+        return None
 
-    # Adiciona variáveis "sempre disponíveis"
-    contexto_completo = {
-        **contexto,
-        "data_geracao": datetime.now().strftime("%d/%m/%Y às %H:%M"),
-    }
+    ctx = _contexto_base({**contexto, **(linha or {})})
+    payload: dict[str, str] = {}
 
-    resultado = {}
+    for nome_arquivo, autoescape, chave in specs:
+        conteudo = _renderizar_arquivo(pasta, nome_arquivo, autoescape, ctx)
+        if conteudo:
+            payload[chave] = conteudo
 
-    # WhatsApp consolidado
-    whatsapp = _renderizar_arquivo(
-        pasta_mensagens, "whatsapp_consolidado.txt", False, contexto_completo
-    )
-    if whatsapp:
-        resultado["whatsapp"] = whatsapp
+    return payload if payload else None
 
-    # Email consolidado: assunto
-    assunto = _renderizar_arquivo(
-        pasta_mensagens, "email_consolidado_assunto.txt", False, contexto_completo
-    )
-    if assunto:
-        resultado["email_assunto"] = assunto
 
-    # Email consolidado: HTML
-    html = _renderizar_arquivo(
-        pasta_mensagens, "email_consolidado_html.html", True, contexto_completo
-    )
-    if html:
-        resultado["email_html"] = html
+def canais_disponiveis(nome_alerta: str) -> dict[str, list[str]]:
+    """
+    Detecta quais combinações (canal, modo) têm template disponível.
+
+    Returns:
+        {"individual": ["whatsapp", "email"], "agrupado": ["whatsapp"]}
+    """
+    pasta = PASTA_ALERTAS / nome_alerta / "mensagens"
+    resultado: dict[str, list[str]] = {"individual": [], "agrupado": []}
+
+    if not pasta.exists():
+        return resultado
+
+    for (canal, modo), specs in _TEMPLATES.items():
+        if any((pasta / nome).exists() for nome, _, _ in specs):
+            resultado.setdefault(modo, []).append(canal)
 
     return resultado
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COMPAT: funções antigas mantidas para não quebrar código existente
+# ─────────────────────────────────────────────────────────────────────────────
 
 def renderizar_mensagens_individuais(
     nome_alerta: str,
     contexto_base: dict,
     linha: dict,
 ) -> dict[str, str]:
-    """
-    Renderiza mensagens individuais (1 por linha do resultado SQL).
-
-    Args:
-        nome_alerta: Nome técnico do alerta
-        contexto_base: Dados gerais (titulo, severidade, etc)
-        linha: Dados de UMA linha específica do resultado SQL
-
-    Returns:
-        Dict com mensagens renderizadas (whatsapp, email_assunto, email_html).
-    """
-    pasta_mensagens = PASTA_ALERTAS / nome_alerta / "mensagens"
-
-    if not pasta_mensagens.exists():
-        return {}
-
-    # Contexto: dados base + dados da linha específica + data
-    contexto_completo = {
-        **contexto_base,
-        **linha,
-        "data_geracao": datetime.now().strftime("%d/%m/%Y às %H:%M"),
-    }
-
+    """Legado. Use renderizar_despacho(canal='whatsapp'|'email', modo='individual')."""
     resultado = {}
-
-    whatsapp = _renderizar_arquivo(
-        pasta_mensagens, "whatsapp_individual.txt", False, contexto_completo
-    )
-    if whatsapp:
-        resultado["whatsapp"] = whatsapp
-
-    assunto = _renderizar_arquivo(
-        pasta_mensagens, "email_individual_assunto.txt", False, contexto_completo
-    )
-    if assunto:
-        resultado["email_assunto"] = assunto
-
-    html = _renderizar_arquivo(
-        pasta_mensagens, "email_individual_html.html", True, contexto_completo
-    )
-    if html:
-        resultado["email_html"] = html
-
+    for canal, chave_wp, chave_as, chave_html in [
+        ("whatsapp", "whatsapp", None, None),
+        ("email",    None, "email_assunto", "email_html"),
+    ]:
+        payload = renderizar_despacho(nome_alerta, canal, "individual", contexto_base, linha)
+        if payload:
+            if canal == "whatsapp":
+                resultado["whatsapp"] = payload.get("mensagem", "")
+            elif canal == "email":
+                if "assunto" in payload:
+                    resultado["email_assunto"] = payload["assunto"]
+                if "html" in payload:
+                    resultado["email_html"] = payload["html"]
     return resultado
 
 
-def detectar_capacidades_alerta(nome_alerta: str) -> dict[str, bool]:
-    """
-    Detecta o que o alerta SABE fazer baseado nos templates que existem.
+def renderizar_mensagens_consolidadas(
+    nome_alerta: str,
+    contexto: dict,
+) -> dict[str, str]:
+    """Legado. Use renderizar_despacho(canal='whatsapp'|'email', modo='agrupado')."""
+    resultado = {}
+    for canal in ("whatsapp", "email"):
+        payload = renderizar_despacho(nome_alerta, canal, "agrupado", contexto)
+        if payload:
+            if canal == "whatsapp":
+                resultado["whatsapp"] = payload.get("mensagem", "")
+            elif canal == "email":
+                if "assunto" in payload:
+                    resultado["email_assunto"] = payload["assunto"]
+                if "html" in payload:
+                    resultado["email_html"] = payload["html"]
+    return resultado
 
-    Returns:
-        {
-            "tem_consolidado": True/False,
-            "tem_individual": True/False,
-            "canais_consolidado": ["whatsapp", "email"],
-            "canais_individual": [...]
-        }
-    """
-    pasta_mensagens = PASTA_ALERTAS / nome_alerta / "mensagens"
 
-    if not pasta_mensagens.exists():
-        return {
-            "tem_consolidado": False,
-            "tem_individual": False,
-            "canais_consolidado": [],
-            "canais_individual": [],
-        }
-
-    canais_consolidado = []
-    if (pasta_mensagens / "whatsapp_consolidado.txt").exists():
-        canais_consolidado.append("whatsapp")
-    if (pasta_mensagens / "email_consolidado_html.html").exists():
-        canais_consolidado.append("email")
-
-    canais_individual = []
-    if (pasta_mensagens / "whatsapp_individual.txt").exists():
-        canais_individual.append("whatsapp")
-    if (pasta_mensagens / "email_individual_html.html").exists():
-        canais_individual.append("email")
-
+def detectar_capacidades_alerta(nome_alerta: str) -> dict:
+    """Legado. Use canais_disponiveis()."""
+    caps = canais_disponiveis(nome_alerta)
     return {
-        "tem_consolidado": len(canais_consolidado) > 0,
-        "tem_individual": len(canais_individual) > 0,
-        "canais_consolidado": canais_consolidado,
-        "canais_individual": canais_individual,
+        "tem_consolidado":    bool(caps.get("agrupado")),
+        "tem_individual":     bool(caps.get("individual")),
+        "canais_consolidado": caps.get("agrupado", []),
+        "canais_individual":  caps.get("individual", []),
     }

@@ -1,0 +1,307 @@
+{
+  "name": "Nexus — Despachos Sender (fila unificada alertas + relatórios)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "* * * * *" }]
+        }
+      },
+      "id": "schedule",
+      "name": "Cron — a cada minuto",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "NEXUS_URL",           "value": "http://192.168.1.100:8000", "type": "string" },
+            { "id": "a2", "name": "NEXUS_API_KEY",        "value": "sua_chave_nexus",           "type": "string" },
+            { "id": "a3", "name": "EVOLUTION_URL",        "value": "https://api.sua-evolution.com", "type": "string" },
+            { "id": "a4", "name": "EVOLUTION_INSTANCE",   "value": "minha_instancia",           "type": "string" },
+            { "id": "a5", "name": "EVOLUTION_API_KEY",    "value": "sua_chave_evolution",       "type": "string" },
+            { "id": "a6", "name": "SMTP_HOST",            "value": "smtp.gmail.com",            "type": "string" },
+            { "id": "a7", "name": "SMTP_PORT",            "value": 587,                         "type": "number" },
+            { "id": "a8", "name": "SMTP_USER",            "value": "seu-email@gmail.com",       "type": "string" },
+            { "id": "a9", "name": "SMTP_PASSWORD",        "value": "xxxx xxxx xxxx xxxx",       "type": "string" },
+            { "id": "a10","name": "SMTP_FROM_NAME",       "value": "Nexus Alertas",             "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "⚙️ Config (Edite aqui)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [250, 300]
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.NEXUS_URL }}/despachos/pendentes?limite=50",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "={{ $json.NEXUS_API_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-pendentes",
+      "name": "GET — despachos/pendentes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300]
+    },
+
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            {
+              "id": "cond-total",
+              "leftValue": "={{ $json.total }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        }
+      },
+      "id": "if-tem",
+      "name": "IF — tem_despachos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [750, 300]
+    },
+
+    {
+      "parameters": {
+        "fieldToSplitOut": "despachos",
+        "options": {}
+      },
+      "id": "split",
+      "name": "Split Out — despachos",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1000, 300]
+    },
+
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "value": "whatsapp", "output": 0 },
+            { "value": "email",    "output": 1 },
+            { "value": "sms",      "output": 2 }
+          ]
+        },
+        "dataType": "string",
+        "value1": "={{ $json.canal }}"
+      },
+      "id": "switch-canal",
+      "name": "Switch — canal",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [1250, 300]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// Decide se é texto simples ou documento (PDF/imagem)\nconst despacho = $input.first().json;\nconst payload = typeof despacho.payload === 'string'\n  ? JSON.parse(despacho.payload)\n  : despacho.payload;\n\nconst tipo = payload.documento_base64 ? 'media' : 'texto';\n\nreturn [{\n  json: {\n    ...despacho,\n    _payload: payload,\n    _tipo_wp: tipo\n  }\n}];"
+      },
+      "id": "code-wp-tipo",
+      "name": "Code — tipo WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 160]
+    },
+
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "value": "texto", "output": 0 },
+            { "value": "media", "output": 1 }
+          ]
+        },
+        "dataType": "string",
+        "value1": "={{ $json._tipo_wp }}"
+      },
+      "id": "switch-wp-tipo",
+      "name": "Switch — WhatsApp tipo",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [1750, 160]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_URL + '/message/sendText/' + $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.destino, text: $json._payload.mensagem }) }}",
+        "options": { "allowUnauthorizedCerts": false }
+      },
+      "id": "evo-sendtext",
+      "name": "Evolution — sendText",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 60],
+      "continueOnFail": true
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_URL + '/message/sendMedia/' + $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $('⚙️ Config (Edite aqui)').first().json.EVOLUTION_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.destino, mediatype: 'document', mimetype: $json._payload.mimetype || 'application/pdf', caption: $json._payload.caption || '', media: $json._payload.documento_base64, fileName: ($json.relatorio_nome || $json.alerta_nome || 'nexus') + '.pdf' }) }}",
+        "options": {}
+      },
+      "id": "evo-sendmedia",
+      "name": "Evolution — sendMedia",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 260],
+      "continueOnFail": true
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// Prepara email: suporta HTML puro ou PDF em anexo\nconst despacho = $input.first().json;\nconst payload = typeof despacho.payload === 'string'\n  ? JSON.parse(despacho.payload)\n  : despacho.payload;\n\nreturn [{\n  json: {\n    ...despacho,\n    _payload: payload,\n    _tem_pdf: !!payload.pdf_base64\n  }\n}];"
+      },
+      "id": "code-email",
+      "name": "Code — preparar email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 440]
+    },
+
+    {
+      "parameters": {
+        "fromEmail": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_FROM_NAME + ' <' + $('⚙️ Config (Edite aqui)').first().json.SMTP_USER + '>' }}",
+        "toEmail": "={{ $json.destino }}",
+        "subject": "={{ $json._payload.assunto || ('Nexus: ' + ($json.alerta_nome || $json.relatorio_nome || 'Notificação')) }}",
+        "html": "={{ $json._payload.html || ('<p>' + ($json._payload.resumo || '') + '</p>') }}",
+        "options": {
+          "host": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_HOST }}",
+          "port": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_PORT }}",
+          "user": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_USER }}",
+          "password": "={{ $('⚙️ Config (Edite aqui)').first().json.SMTP_PASSWORD }}",
+          "ssl": false,
+          "attachments": "={{ $json._tem_pdf ? JSON.stringify([{ fileName: ($json.relatorio_nome || 'relatorio') + '.pdf', data: $json._payload.pdf_base64, mimeType: 'application/pdf' }]) : '[]' }}"
+        }
+      },
+      "id": "smtp-send",
+      "name": "SMTP — enviar email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [1750, 440],
+      "continueOnFail": true
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// Coleta resultado de qualquer canal de envio e determina status\nconst item = $input.first();\nconst despachoId = item.json.id\n  || item.json._payload?.id\n  || null;\n\n// Detecta erro: campo $error existe em continueOnFail\nconst temErro = !!item.json.error || !!item.error;\nconst statusCode = item.json.statusCode || 200;\nconst erroMsg = temErro\n  ? (item.json.error?.message || JSON.stringify(item.json.error || 'erro desconhecido'))\n  : (statusCode >= 400 ? `HTTP ${statusCode}` : null);\n\nconst sucesso = !temErro && statusCode < 400;\n\nreturn [{\n  json: {\n    despacho_id: despachoId,\n    status:      sucesso ? 'enviado' : 'falhou',\n    erro:        erroMsg || null,\n    tentativas:  (item.json.tentativas || 0) + 1\n  }\n}];"
+      },
+      "id": "code-resultado",
+      "name": "Code — avaliar resultado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 300]
+    },
+
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('⚙️ Config (Edite aqui)').first().json.NEXUS_URL + '/despachos/' + $json.despacho_id + '/status' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key",    "value": "={{ $('⚙️ Config (Edite aqui)').first().json.NEXUS_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: $json.status, erro: $json.erro, tentativas: $json.tentativas }) }}",
+        "options": {}
+      },
+      "id": "patch-status",
+      "name": "PATCH — despachos status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2500, 300]
+    }
+  ],
+
+  "connections": {
+    "Cron — a cada minuto": {
+      "main": [[{ "node": "⚙️ Config (Edite aqui)", "type": "main", "index": 0 }]]
+    },
+    "⚙️ Config (Edite aqui)": {
+      "main": [[{ "node": "GET — despachos/pendentes", "type": "main", "index": 0 }]]
+    },
+    "GET — despachos/pendentes": {
+      "main": [[{ "node": "IF — tem_despachos?", "type": "main", "index": 0 }]]
+    },
+    "IF — tem_despachos?": {
+      "main": [
+        [{ "node": "Split Out — despachos", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split Out — despachos": {
+      "main": [[{ "node": "Switch — canal", "type": "main", "index": 0 }]]
+    },
+    "Switch — canal": {
+      "main": [
+        [{ "node": "Code — tipo WhatsApp", "type": "main", "index": 0 }],
+        [{ "node": "Code — preparar email", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code — tipo WhatsApp": {
+      "main": [[{ "node": "Switch — WhatsApp tipo", "type": "main", "index": 0 }]]
+    },
+    "Switch — WhatsApp tipo": {
+      "main": [
+        [{ "node": "Evolution — sendText",  "type": "main", "index": 0 }],
+        [{ "node": "Evolution — sendMedia", "type": "main", "index": 0 }]
+      ]
+    },
+    "Evolution — sendText": {
+      "main": [[{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]]
+    },
+    "Evolution — sendMedia": {
+      "main": [[{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]]
+    },
+    "Code — preparar email": {
+      "main": [[{ "node": "SMTP — enviar email", "type": "main", "index": 0 }]]
+    },
+    "SMTP — enviar email": {
+      "main": [[{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]]
+    },
+    "Code — avaliar resultado": {
+      "main": [[{ "node": "PATCH — despachos status", "type": "main", "index": 0 }]]
+    }
+  }
+}

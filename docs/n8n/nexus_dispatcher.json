@@ -1,5 +1,5 @@
 {
-  "name": "Nexus — Dispatcher v3 (unificado alertas + relatórios)",
+  "name": "Nexus — Agendamentos Trigger v4 (dispara recursos, despachos via sender)",
   "nodes": [
     {
       "parameters": {
@@ -210,18 +210,19 @@
         "url": "={{ $('⚙️ Config (Edite aqui)').first().json.NEXUS_URL + '/relatorios/' + $json.recurso_nome + '/solicitar' }}",
         "sendQueryParameters": true,
         "queryParameters": {
-          "parameters": [{ "name": "formato", "value": "pdf" }]
+          "parameters": [
+            { "name": "formato",       "value": "json" },
+            { "name": "notificar",     "value": "true" },
+            { "name": "agendamento_id","value": "={{ $json.id }}" }
+          ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ parametros: $json.parametros }) }}",
-        "options": {
-          "responseFormat": "file",
-          "outputDataFieldName": "data"
-        }
+        "options": {}
       },
       "id": "post-relatorio",
-      "name": "POST — solicitar relatório PDF",
+      "name": "POST — solicitar relatório (notificar)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1500, 500]
@@ -347,19 +348,7 @@
     "SMTP — enviar email alerta": {
       "main": [[{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]]
     },
-    "POST — solicitar relatório PDF": {
-      "main": [[{ "node": "Code — PDF base64", "type": "main", "index": 0 }]]
-    },
-    "Code — PDF base64": {
-      "main": [
-        [{ "node": "Evolution — sendMedia PDF", "type": "main", "index": 0 }],
-        [{ "node": "SMTP — enviar PDF relatório", "type": "main", "index": 0 }]
-      ]
-    },
-    "Evolution — sendMedia PDF": {
-      "main": [[{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]]
-    },
-    "SMTP — enviar PDF relatório": {
+    "POST — solicitar relatório (notificar)": {
       "main": [[{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]]
     }
   }

@@ -13,7 +13,7 @@ from fastapi.openapi.utils import get_openapi
 from app.core.autenticacao import middleware_api_key
 from app.core.inicializador import garantir_estrutura_banco
 from app.core.sincronizador import sincronizar_filesystem_com_banco
-from app.rotas import ad, admin, agendamentos, alertas, chatbot, conexoes, permissoes, relatorios, saude, usuarios
+from app.rotas import ad, admin, agendamentos, alertas, chatbot, conexoes, despachos, permissoes, relatorios, saude, usuarios
 from config import configuracoes
 
 _LOG_DIR = Path("/app/logs")
@@ -99,4 +99,5 @@ app.include_router(permissoes.router)
 app.include_router(relatorios.router)
 app.include_router(alertas.router)
 app.include_router(agendamentos.router)
+app.include_router(despachos.router)
 app.include_router(chatbot.router)

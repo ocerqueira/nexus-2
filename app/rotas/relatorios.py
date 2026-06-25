@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Path, Query
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 
+from app.core.orquestrador_relatorios import orquestrar_relatorio
 from app.core.renderizador import gerar_pdf, renderizar_html
 from app.relatorios.dashboard_conexoes.processador import ProcessadorDashboardConexoes
 from app.relatorios.desempenho_vendas.processador import ProcessadorDesempenhoVendas
@@ -60,6 +61,9 @@ def solicitar_relatorio(
     nome_relatorio: str = Path(description="Nome técnico do relatório (ex: 'pedidos_por_vendedor', 'dashboard_conexoes')"),
     requisicao: RequisicaoRelatorio | None = None,
     formato: str = Query("json", description="Formato de saída: 'json' (dados), 'html' (página) ou 'pdf' (documento binário)"),
+    notificar: bool = Query(False, description="Se True, cria despachos para destinatários configurados"),
+    usuario_id: int | None = Query(None, description="ID do usuário solicitante (para despacho on-demand)"),
+    agendamento_id: int | None = Query(None, description="ID do agendamento que originou esta solicitação"),
 ):
     """
     Solicita a geração de um relatório.
@@ -69,12 +73,9 @@ def solicitar_relatorio(
     - **html**: visualização para email/web — retorna HTML renderizado
     - **pdf**: documento para download — retorna PDF binário com Content-Disposition: attachment
 
-    Exemplo com curl:
-    ```
-    curl -X POST "http://localhost:8000/relatorios/pedidos_por_vendedor/solicitar?formato=pdf" \\
-      -H "Content-Type: application/json" \\
-      -d '{"parametros": {"data_inicio": "2026-01-01", "data_fim": "2026-01-31"}}'
-    ```
+    Com `notificar=true`, cria despachos no banco para os destinatários configurados
+    (relatorios_destinatarios + agendamentos_destinatarios + usuario_id avulso).
+    Os despachos são processados pelo workflow `nexus_despachos_sender` no N8N.
     """
     # 1. Validar formato
     formatos_validos = ["json", "html", "pdf"]
@@ -112,13 +113,33 @@ def solicitar_relatorio(
         logger.error(f"Erro ao processar: {erro}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro: {erro!s}")
 
-    # 5. Retornar conforme formato
+    # 5. Criar despachos se solicitado
+    despachos_info = None
+    if notificar:
+        try:
+            despachos_info = orquestrar_relatorio(
+                nome_relatorio=nome_relatorio,
+                processador_classe=info_relatorio["classe"],
+                titulo=info_relatorio["titulo"],
+                subtitulo=info_relatorio.get("subtitulo"),
+                parametros=parametros,
+                agendamento_id=agendamento_id,
+                usuario_solicitante_id=usuario_id,
+                comprimir_pdf=True,
+            )
+        except Exception as e:
+            logger.error(f"Erro ao criar despachos para '{nome_relatorio}': {e}", exc_info=True)
+
+    # 6. Retornar conforme formato
     if formato == "json":
-        return {
+        resp: dict = {
             "status": "sucesso",
             "relatorio": nome_relatorio,
             "payload": dados,
         }
+        if despachos_info:
+            resp["despachos"] = despachos_info
+        return resp
 
     elif formato == "html":
         html = renderizar_html(
