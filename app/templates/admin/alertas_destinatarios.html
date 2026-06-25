@@ -1,0 +1,131 @@
+{% from "admin/_macros.html" import badge, btn_acao %}
+{# Drawer: destinatários de um alerta #}
+
+{# ── Cooldown global do alerta ─────────────────────────── #}
+<div class="mb-4 pb-4 border-b border-slate-100">
+  <div class="flex items-center gap-3">
+    <span class="text-xs text-slate-500 w-24 flex-shrink-0">Cooldown global</span>
+    <form hx-post="/admin/alertas/{{ alerta_id }}/cooldown"
+          hx-target="#cooldown-val-{{ alerta_id }}"
+          hx-swap="outerHTML"
+          class="flex gap-1.5 items-center">
+      <input type="number" name="cooldown" value="{{ cooldown_minutos }}" min="1" max="10080"
+             class="w-20 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300">
+      <span class="text-xs text-slate-400">min</span>
+      <button type="submit"
+              class="px-2.5 py-1 text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded transition-colors">✓</button>
+    </form>
+    <span id="cooldown-val-{{ alerta_id }}" class="text-xs text-slate-400"></span>
+  </div>
+</div>
+
+{# ── Lista de destinatários ──────────────────────────────── #}
+<div id="dest-list-{{ alerta_id }}" class="space-y-2 mb-5">
+{% if not dests %}
+<div class="text-center py-8">
+  <svg class="w-8 h-8 text-slate-200 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+  </svg>
+  <p class="text-slate-400 text-sm">Nenhum destinatário</p>
+</div>
+{% else %}
+{% for d in dests %}
+<div class="border border-slate-200 rounded-xl p-3 {{ 'opacity-60' if not d.ativo else '' }}">
+  <div class="flex items-center justify-between mb-2">
+    <div class="flex items-center gap-2">
+      <span class="font-medium text-slate-700 text-sm">{{ d.usuario_nome }}</span>
+      {% if d.ativo %}{{ badge("ativo", "green") }}{% else %}{{ badge("inativo", "gray") }}{% endif %}
+      {{ badge(d.modo_mensagem or "individual", "blue") }}
+    </div>
+    <div class="flex items-center gap-1.5">
+      {% if d.ativo %}
+      {{ btn_acao("Desativar",
+          'hx-post="/admin/alertas_destinatarios/' ~ d.id ~ '/toggle" hx-target="#dest-list-' ~ alerta_id ~ '" hx-swap="outerHTML"',
+          "danger") }}
+      {% else %}
+      {{ btn_acao("Ativar",
+          'hx-post="/admin/alertas_destinatarios/' ~ d.id ~ '/toggle" hx-target="#dest-list-' ~ alerta_id ~ '" hx-swap="outerHTML"',
+          "success") }}
+      {% endif %}
+      {{ btn_acao("Remover",
+          'hx-delete="/admin/alertas_destinatarios/' ~ d.id ~ '" hx-target="#dest-list-' ~ alerta_id ~ '" hx-swap="outerHTML" hx-confirm="Remover destinatário?"',
+          "danger") }}
+    </div>
+  </div>
+  <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+    <span>Canais: <strong class="text-slate-600">{{ (d.canais or []) | join(", ") or "—" }}</strong></span>
+    {% if d.limite_hora %}<span>Limite/h: <strong class="text-slate-600">{{ d.limite_hora }}</strong></span>{% endif %}
+    {% if d.limite_dia  %}<span>Limite/dia: <strong class="text-slate-600">{{ d.limite_dia }}</strong></span>{% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+</div>
+
+{# ── Adicionar destinatário ──────────────────────────────── #}
+<details class="border border-dashed border-indigo-200 rounded-xl">
+  <summary class="px-4 py-3 text-xs font-medium text-indigo-600 cursor-pointer hover:bg-indigo-50 rounded-xl select-none">
+    + Adicionar destinatário
+  </summary>
+  <form hx-post="/admin/alertas/{{ alerta_id }}/destinatarios"
+        hx-target="#dest-list-{{ alerta_id }}" hx-swap="outerHTML"
+        class="px-4 pb-4 space-y-3 pt-3">
+
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Usuário</label>
+      <select name="usuario_id" required
+              class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-300 bg-white">
+        <option value="">Selecione...</option>
+        {% for u in usuarios %}
+        <option value="{{ u.id }}">{{ u.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Canais</label>
+      <div class="flex gap-3 flex-wrap">
+        {% for val, label in [("whatsapp", "WhatsApp"), ("email", "E-mail"), ("sms", "SMS")] %}
+        <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+          <input type="checkbox" name="canais" value="{{ val }}"
+                 class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300">
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Modo mensagem</label>
+      <div class="flex gap-3">
+        {% for val, label in [("individual", "Individual (1/item)"), ("agrupado", "Agrupado (tudo)")] %}
+        <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+          <input type="radio" name="modo_mensagem" value="{{ val }}"
+                 {% if val == "individual" %}checked{% endif %}
+                 class="text-indigo-600 focus:ring-indigo-300">
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="flex gap-4">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Limite/hora</label>
+        <input type="number" name="limite_hora" min="1" placeholder="sem limite"
+               class="w-28 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Limite/dia</label>
+        <input type="number" name="limite_dia" min="1" placeholder="sem limite"
+               class="w-28 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300">
+      </div>
+    </div>
+
+    <button type="submit"
+            class="w-full py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
+      Adicionar
+    </button>
+  </form>
+</details>

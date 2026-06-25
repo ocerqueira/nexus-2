@@ -1,0 +1,113 @@
+{% from "admin/_macros.html" import badge, btn_acao %}
+{# Drawer: destinatários fixos de um relatório #}
+
+{% if relatorio %}
+<div class="mb-4 pb-3 border-b border-slate-100 text-xs text-slate-400 flex gap-4">
+  <span>modo execução: <strong class="text-slate-600">{{ relatorio.modo_execucao or "unico" }}</strong></span>
+  <span class="text-slate-300">|</span>
+  <span class="text-slate-400 italic">
+    {% if relatorio.modo_execucao == "por_destinatario" %}
+      Cada destinatário recebe PDF filtrado via filtro_parametros
+    {% else %}
+      Mesmo relatório enviado para todos
+    {% endif %}
+  </span>
+</div>
+{% endif %}
+
+{# ── Lista ──────────────────────────────────────────────── #}
+<div id="rd-list-{{ relatorio_id }}" class="space-y-2 mb-5">
+{% if not dests %}
+<div class="text-center py-8">
+  <svg class="w-8 h-8 text-slate-200 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+  </svg>
+  <p class="text-slate-400 text-sm">Nenhum destinatário fixo</p>
+</div>
+{% else %}
+{% for d in dests %}
+<div class="border border-slate-200 rounded-xl p-3">
+  <div class="flex items-center justify-between mb-1.5">
+    <span class="font-medium text-slate-700 text-sm">{{ d.usuario_nome }}</span>
+    {{ btn_acao("Remover",
+        'hx-delete="/admin/relatorios_destinatarios/' ~ d.id ~ '" hx-target="#rd-list-' ~ relatorio_id ~ '" hx-swap="outerHTML" hx-confirm="Remover destinatário?"',
+        "danger") }}
+  </div>
+  <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+    <span>Canais: <strong class="text-slate-600">{{ (d.canais or []) | join(", ") or "—" }}</strong></span>
+    <span>WhatsApp: <strong class="text-slate-600">{{ d.formato_whatsapp or "documento" }}</strong></span>
+    {% if d.filtro_parametros_json %}
+    <span class="truncate max-w-xs" title="{{ d.filtro_parametros_json }}">
+      filtro: <code class="text-slate-600">{{ d.filtro_parametros_json[:40] }}{% if d.filtro_parametros_json | length > 40 %}…{% endif %}</code>
+    </span>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+</div>
+
+{# ── Adicionar ──────────────────────────────────────────── #}
+<details class="border border-dashed border-indigo-200 rounded-xl">
+  <summary class="px-4 py-3 text-xs font-medium text-indigo-600 cursor-pointer hover:bg-indigo-50 rounded-xl select-none">
+    + Adicionar destinatário
+  </summary>
+  <form hx-post="/admin/relatorios/{{ relatorio_id }}/destinatarios"
+        hx-target="#rd-list-{{ relatorio_id }}" hx-swap="outerHTML"
+        class="px-4 pb-4 space-y-3 pt-3">
+
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Usuário</label>
+      <select name="usuario_id" required
+              class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-300 bg-white">
+        <option value="">Selecione...</option>
+        {% for u in usuarios %}
+        <option value="{{ u.id }}">{{ u.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Canais</label>
+      <div class="flex gap-3 flex-wrap">
+        {% for val, label in [("whatsapp", "WhatsApp"), ("email", "E-mail")] %}
+        <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+          <input type="checkbox" name="canais" value="{{ val }}"
+                 class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-300">
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Formato WhatsApp</label>
+      <div class="flex gap-3">
+        {% for val, label in [("documento", "Documento PDF"), ("resumo_texto", "Resumo texto")] %}
+        <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+          <input type="radio" name="formato_whatsapp" value="{{ val }}"
+                 {% if val == "documento" %}checked{% endif %}
+                 class="text-indigo-600 focus:ring-indigo-300">
+          {{ label }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if relatorio.modo_execucao == "por_destinatario" %}
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">
+        Filtro de parâmetros <span class="text-slate-400">(JSON — override para este destinatário)</span>
+      </label>
+      <textarea name="filtro_parametros_json" rows="3" placeholder='{"vendedor_id": 42}'
+                class="w-full px-2 py-1.5 text-xs font-mono border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300"></textarea>
+    </div>
+    {% endif %}
+
+    <button type="submit"
+            class="w-full py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
+      Adicionar
+    </button>
+  </form>
+</details>

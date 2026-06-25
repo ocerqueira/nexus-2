@@ -135,6 +135,15 @@
 
         {# Ações #}
         <div class="flex-shrink-0 pt-0.5 flex items-center gap-2">
+          <button class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium
+                         bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200
+                         rounded-lg transition-colors"
+                  hx-get="/admin/agendamentos/{{ ag.id }}/destinatarios"
+                  hx-target="#drawer-body" hx-swap="innerHTML"
+                  data-drawer-title="Destinatários extras — {{ ag.recurso_nome }}"
+                  onclick="openDrawer(this.dataset.drawerTitle)">
+            Dest.
+          </button>
           {% if ag.ativo %}
           {{ btn_acao("▶ Executar agora",
               'hx-post="/admin/agendamentos/' ~ ag.id ~ '/executar-agora" hx-swap="outerHTML"',

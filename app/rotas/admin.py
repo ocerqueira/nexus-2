@@ -281,6 +281,91 @@ def admin_relatorios_disparar(request: Request, relatorio_id: int):
 
 
 # =============================================================================
+# RELATÓRIOS — DESTINATÁRIOS (drawer)
+# =============================================================================
+
+def _rel_dest_ctx(relatorio_id: int) -> dict:
+    with engine.connect() as c:
+        row_rel = c.execute(text(
+            "SELECT nome, titulo, COALESCE(modo_execucao, 'unico') AS modo_execucao FROM relatorios WHERE id=:id"
+        ), {"id": relatorio_id}).mappings().first()
+        dests_raw = c.execute(text("""
+            SELECT rd.id, rd.usuario_id, u.nome AS usuario_nome,
+                   rd.canais, rd.formato_whatsapp, rd.filtro_parametros
+            FROM relatorios_destinatarios rd
+            JOIN usuarios u ON u.id = rd.usuario_id
+            WHERE rd.relatorio_id = :id
+            ORDER BY u.nome
+        """), {"id": relatorio_id}).mappings().all()
+        usuarios = [dict(r) for r in c.execute(text(
+            "SELECT id, nome FROM usuarios WHERE ativo=TRUE ORDER BY nome"
+        )).mappings().all()]
+    dests = []
+    for d in dests_raw:
+        dd = dict(d)
+        fp = dd.get("filtro_parametros") or {}
+        dd["filtro_parametros_json"] = json.dumps(fp, ensure_ascii=False, indent=2) if fp else ""
+        dests.append(dd)
+    return {
+        "dests": dests,
+        "usuarios": usuarios,
+        "relatorio_id": relatorio_id,
+        "relatorio": dict(row_rel) if row_rel else {},
+    }
+
+
+@router.get("/relatorios/{relatorio_id}/destinatarios", response_class=HTMLResponse)
+def admin_relatorios_destinatarios(request: Request, relatorio_id: int):
+    return templates.TemplateResponse(request, "admin/relatorios_destinatarios.html",
+                                      _rel_dest_ctx(relatorio_id))
+
+
+@router.post("/relatorios/{relatorio_id}/destinatarios", response_class=HTMLResponse)
+def admin_relatorios_dest_add(
+    request: Request, relatorio_id: int,
+    usuario_id: Annotated[int, Form()],
+    canais: Annotated[list[str], Form()] = Form(default=[]),
+    formato_whatsapp: Annotated[str, Form()] = "documento",
+    filtro_parametros_json: Annotated[str | None, Form()] = None,
+):
+    canais_validos = [ch for ch in canais if ch in ("whatsapp", "email", "sms")]
+    try:
+        filtro = json.loads(filtro_parametros_json) if filtro_parametros_json and filtro_parametros_json.strip() else {}
+    except Exception:
+        filtro = {}
+    try:
+        with engine.begin() as c:
+            c.execute(text("""
+                INSERT INTO relatorios_destinatarios
+                    (relatorio_id, usuario_id, canais, formato_whatsapp, filtro_parametros)
+                VALUES (:rid, :uid, CAST(:canais AS jsonb), :fmt, CAST(:fp AS jsonb))
+                ON CONFLICT (relatorio_id, usuario_id) DO UPDATE SET
+                    canais=CAST(:canais AS jsonb), formato_whatsapp=:fmt,
+                    filtro_parametros=CAST(:fp AS jsonb)
+            """), {"rid": relatorio_id, "uid": usuario_id,
+                   "canais": json.dumps(canais_validos), "fmt": formato_whatsapp,
+                   "fp": json.dumps(filtro)})
+    except Exception as e:
+        logger.error(f"Erro ao adicionar destinatário relatório: {e}")
+    return templates.TemplateResponse(request, "admin/relatorios_destinatarios.html",
+                                      _rel_dest_ctx(relatorio_id))
+
+
+@router.delete("/relatorios_destinatarios/{dest_id}", response_class=HTMLResponse)
+def admin_relatorios_dest_rm(request: Request, dest_id: int):
+    with engine.begin() as c:
+        row = c.execute(text(
+            "SELECT relatorio_id FROM relatorios_destinatarios WHERE id=:id"
+        ), {"id": dest_id}).mappings().first()
+        if not row:
+            return HTMLResponse("—")
+        relatorio_id = row["relatorio_id"]
+        c.execute(text("DELETE FROM relatorios_destinatarios WHERE id=:id"), {"id": dest_id})
+    return templates.TemplateResponse(request, "admin/relatorios_destinatarios.html",
+                                      _rel_dest_ctx(relatorio_id))
+
+
+# =============================================================================
 # ALERTAS
 # =============================================================================
 
@@ -293,9 +378,10 @@ def _alertas_db(status_filtro: str = "") -> tuple[list[dict], int]:
     with engine.connect() as c:
         rows = c.execute(text(f"""
             SELECT a.id, a.nome, a.titulo, a.severidade, a.status, a.ultimo_sync,
-                   COUNT(ac.id) FILTER (WHERE ac.ativo) AS condicoes_ativas
+                   COALESCE(a.cooldown_minutos, 60) AS cooldown_minutos,
+                   COUNT(ad.id) FILTER (WHERE ad.ativo) AS destinatarios_ativos
             FROM alertas a
-            LEFT JOIN alertas_condicoes ac ON ac.alerta_id = a.id
+            LEFT JOIN alertas_destinatarios ad ON ad.alerta_id = a.id
             {filtro_sql}
             GROUP BY a.id
             ORDER BY
@@ -501,6 +587,106 @@ def admin_condicao_rm_dest(request: Request, condicao_id: int, usuario_id: int):
 
 
 # =============================================================================
+# ALERTAS — DESTINATÁRIOS (drawer — substitui alertas_condicoes)
+# =============================================================================
+
+def _alertas_dest_ctx(alerta_id: int) -> dict:
+    with engine.connect() as c:
+        row_alerta = c.execute(text(
+            "SELECT cooldown_minutos FROM alertas WHERE id=:id"
+        ), {"id": alerta_id}).mappings().first()
+        dests_raw = c.execute(text("""
+            SELECT ad.id, ad.usuario_id, u.nome AS usuario_nome,
+                   ad.canais, ad.modo_mensagem, ad.limite_hora, ad.limite_dia, ad.ativo
+            FROM alertas_destinatarios ad
+            JOIN usuarios u ON u.id = ad.usuario_id
+            WHERE ad.alerta_id = :id
+            ORDER BY u.nome
+        """), {"id": alerta_id}).mappings().all()
+        usuarios = [dict(r) for r in c.execute(text(
+            "SELECT id, nome FROM usuarios WHERE ativo=TRUE ORDER BY nome"
+        )).mappings().all()]
+    cooldown = (row_alerta["cooldown_minutos"] if row_alerta else None) or 60
+    return {
+        "dests": [dict(d) for d in dests_raw],
+        "usuarios": usuarios,
+        "alerta_id": alerta_id,
+        "cooldown_minutos": cooldown,
+    }
+
+
+@router.get("/alertas/{alerta_id}/destinatarios", response_class=HTMLResponse)
+def admin_alertas_destinatarios(request: Request, alerta_id: int):
+    return templates.TemplateResponse(request, "admin/alertas_destinatarios.html",
+                                      _alertas_dest_ctx(alerta_id))
+
+
+@router.post("/alertas/{alerta_id}/destinatarios", response_class=HTMLResponse)
+def admin_alertas_dest_add(
+    request: Request, alerta_id: int,
+    usuario_id: Annotated[int, Form()],
+    canais: Annotated[list[str], Form()] = Form(default=[]),
+    modo_mensagem: Annotated[str, Form()] = "individual",
+    limite_hora: Annotated[int | None, Form()] = None,
+    limite_dia: Annotated[int | None, Form()] = None,
+):
+    canais_validos = [ch for ch in canais if ch in ("whatsapp", "email", "sms")]
+    try:
+        with engine.begin() as c:
+            c.execute(text("""
+                INSERT INTO alertas_destinatarios
+                    (alerta_id, usuario_id, canais, modo_mensagem, limite_hora, limite_dia)
+                VALUES (:aid, :uid, CAST(:canais AS jsonb), :modo, :lh, :ld)
+                ON CONFLICT (alerta_id, usuario_id) DO UPDATE SET
+                    canais=CAST(:canais AS jsonb), modo_mensagem=:modo,
+                    limite_hora=:lh, limite_dia=:ld, ativo=TRUE
+            """), {"aid": alerta_id, "uid": usuario_id,
+                   "canais": json.dumps(canais_validos), "modo": modo_mensagem,
+                   "lh": limite_hora or None, "ld": limite_dia or None})
+    except Exception as e:
+        logger.error(f"Erro ao adicionar destinatário alerta: {e}")
+    return templates.TemplateResponse(request, "admin/alertas_destinatarios.html",
+                                      _alertas_dest_ctx(alerta_id))
+
+
+@router.delete("/alertas_destinatarios/{dest_id}", response_class=HTMLResponse)
+def admin_alertas_dest_rm(request: Request, dest_id: int):
+    with engine.begin() as c:
+        row = c.execute(text(
+            "SELECT alerta_id FROM alertas_destinatarios WHERE id=:id"
+        ), {"id": dest_id}).mappings().first()
+        if not row:
+            return HTMLResponse("—")
+        alerta_id = row["alerta_id"]
+        c.execute(text("DELETE FROM alertas_destinatarios WHERE id=:id"), {"id": dest_id})
+    return templates.TemplateResponse(request, "admin/alertas_destinatarios.html",
+                                      _alertas_dest_ctx(alerta_id))
+
+
+@router.post("/alertas_destinatarios/{dest_id}/toggle", response_class=HTMLResponse)
+def admin_alertas_dest_toggle(request: Request, dest_id: int):
+    with engine.begin() as c:
+        row = c.execute(text(
+            "SELECT alerta_id, ativo FROM alertas_destinatarios WHERE id=:id"
+        ), {"id": dest_id}).mappings().first()
+        if not row:
+            return HTMLResponse("—")
+        c.execute(text("UPDATE alertas_destinatarios SET ativo=:v WHERE id=:id"),
+                  {"v": not row["ativo"], "id": dest_id})
+        alerta_id = row["alerta_id"]
+    return templates.TemplateResponse(request, "admin/alertas_destinatarios.html",
+                                      _alertas_dest_ctx(alerta_id))
+
+
+@router.post("/alertas/{alerta_id}/cooldown", response_class=HTMLResponse)
+def admin_alertas_cooldown(request: Request, alerta_id: int, cooldown: Annotated[int, Form()]):
+    with engine.begin() as c:
+        c.execute(text("UPDATE alertas SET cooldown_minutos=:v WHERE id=:id"),
+                  {"v": cooldown, "id": alerta_id})
+    return HTMLResponse(f'<span id="cooldown-val-{alerta_id}" class="text-xs text-green-600 font-medium">{cooldown} min ✓</span>')
+
+
+# =============================================================================
 # CONEXÕES
 # =============================================================================
 
@@ -617,7 +803,10 @@ def admin_conexoes_limpar_cache(conexao_id: int):
 # =============================================================================
 
 _SQL_USUARIO = text("""
-    SELECT id, nome, identificador, origem, email, whatsapp_numero, departamento, cargo, ativo
+    SELECT id, nome, identificador, origem, email, whatsapp_numero, departamento, cargo, ativo,
+           silencio_ativo,
+           TO_CHAR(silencio_inicio, 'HH24:MI') AS silencio_inicio,
+           TO_CHAR(silencio_fim,   'HH24:MI') AS silencio_fim
     FROM usuarios WHERE id = :id
 """)
 
@@ -698,10 +887,28 @@ def admin_usuarios_salvar(
     usuario_id: int,
     whatsapp_numero: Annotated[str | None, Form()] = None,
     email: Annotated[str | None, Form()] = None,
+    silencio_ativo: Annotated[str | None, Form()] = None,
+    silencio_inicio: Annotated[str | None, Form()] = None,
+    silencio_fim: Annotated[str | None, Form()] = None,
 ):
     with engine.begin() as c:
-        c.execute(text("UPDATE usuarios SET whatsapp_numero=:wpp, email=:email, atualizado_em=NOW() WHERE id=:id"),
-                  {"wpp": whatsapp_numero or None, "email": email or None, "id": usuario_id})
+        c.execute(text("""
+            UPDATE usuarios SET
+                whatsapp_numero = :wpp,
+                email = :email,
+                silencio_ativo = :sil_ativo,
+                silencio_inicio = CASE WHEN :sil_inicio IS NOT NULL THEN :sil_inicio::time ELSE NULL END,
+                silencio_fim    = CASE WHEN :sil_fim    IS NOT NULL THEN :sil_fim::time    ELSE NULL END,
+                atualizado_em = NOW()
+            WHERE id = :id
+        """), {
+            "wpp": whatsapp_numero or None,
+            "email": email or None,
+            "sil_ativo": silencio_ativo == "true",
+            "sil_inicio": silencio_inicio or None,
+            "sil_fim": silencio_fim or None,
+            "id": usuario_id,
+        })
         row = c.execute(_SQL_USUARIO, {"id": usuario_id}).mappings().first()
     if not row:
         return HTMLResponse("—")
@@ -981,6 +1188,74 @@ def admin_agendamentos_executar_agora(request: Request, agendamento_id: int):
 
 
 # =============================================================================
+# AGENDAMENTOS — DESTINATÁRIOS (drawer)
+# =============================================================================
+
+def _ag_dest_ctx(agendamento_id: int) -> dict:
+    with engine.connect() as c:
+        row_ag = c.execute(text("""
+            SELECT a.id, COALESCE(r.titulo, al.titulo) AS recurso_nome
+            FROM agendamentos a
+            LEFT JOIN relatorios r ON a.tipo_recurso='relatorio' AND r.id=a.recurso_id
+            LEFT JOIN alertas al ON a.tipo_recurso='alerta' AND al.id=a.recurso_id
+            WHERE a.id = :id
+        """), {"id": agendamento_id}).mappings().first()
+        dests_raw = c.execute(text("""
+            SELECT ad.usuario_id, u.nome AS usuario_nome, ad.canais
+            FROM agendamentos_destinatarios ad
+            JOIN usuarios u ON u.id = ad.usuario_id
+            WHERE ad.agendamento_id = :id
+            ORDER BY u.nome
+        """), {"id": agendamento_id}).mappings().all()
+        usuarios = [dict(r) for r in c.execute(text(
+            "SELECT id, nome FROM usuarios WHERE ativo=TRUE ORDER BY nome"
+        )).mappings().all()]
+    return {
+        "dests": [dict(d) for d in dests_raw],
+        "usuarios": usuarios,
+        "agendamento_id": agendamento_id,
+        "agendamento": dict(row_ag) if row_ag else {},
+    }
+
+
+@router.get("/agendamentos/{agendamento_id}/destinatarios", response_class=HTMLResponse)
+def admin_agendamentos_destinatarios(request: Request, agendamento_id: int):
+    return templates.TemplateResponse(request, "admin/agendamentos_destinatarios.html",
+                                      _ag_dest_ctx(agendamento_id))
+
+
+@router.post("/agendamentos/{agendamento_id}/destinatarios", response_class=HTMLResponse)
+def admin_agendamentos_dest_add(
+    request: Request, agendamento_id: int,
+    usuario_id: Annotated[int, Form()],
+    canais: Annotated[list[str], Form()] = Form(default=[]),
+):
+    canais_validos = [ch for ch in canais if ch in ("whatsapp", "email", "sms")]
+    try:
+        with engine.begin() as c:
+            c.execute(text("""
+                INSERT INTO agendamentos_destinatarios (agendamento_id, usuario_id, canais)
+                VALUES (:ag_id, :uid, CAST(:canais AS jsonb))
+                ON CONFLICT (agendamento_id, usuario_id) DO UPDATE SET canais=CAST(:canais AS jsonb)
+            """), {"ag_id": agendamento_id, "uid": usuario_id, "canais": json.dumps(canais_validos)})
+    except Exception as e:
+        logger.error(f"Erro ao adicionar destinatário agendamento: {e}")
+    return templates.TemplateResponse(request, "admin/agendamentos_destinatarios.html",
+                                      _ag_dest_ctx(agendamento_id))
+
+
+@router.delete("/agendamentos_destinatarios/{agendamento_id}/{usuario_id}", response_class=HTMLResponse)
+def admin_agendamentos_dest_rm(request: Request, agendamento_id: int, usuario_id: int):
+    with engine.begin() as c:
+        c.execute(text("""
+            DELETE FROM agendamentos_destinatarios
+            WHERE agendamento_id=:ag_id AND usuario_id=:uid
+        """), {"ag_id": agendamento_id, "uid": usuario_id})
+    return templates.TemplateResponse(request, "admin/agendamentos_destinatarios.html",
+                                      _ag_dest_ctx(agendamento_id))
+
+
+# =============================================================================
 # PERMISSÕES
 # =============================================================================
 
@@ -1088,6 +1363,76 @@ def admin_permissoes_revogar(request: Request, permissao_id: int):
         c.execute(text("DELETE FROM permissoes WHERE id=:id"), {"id": permissao_id})
     return templates.TemplateResponse(request, "admin/permissoes.html",
                                       _permissoes_ctx(msg="Permissão revogada.", msg_tipo="ok"))
+
+
+# =============================================================================
+# DESPACHOS (view somente-leitura + filtros)
+# =============================================================================
+
+_DESP_POR_PAG = 30
+
+
+def _despachos_db(status: str = "", canal: str = "", busca: str = "",
+                  pagina: int = 1) -> tuple[list[dict], int]:
+    filtros = ["1=1"]
+    params: dict = {"lim": _DESP_POR_PAG, "off": (pagina - 1) * _DESP_POR_PAG}
+    if status:
+        filtros.append("d.status = :status")
+        params["status"] = status
+    if canal:
+        filtros.append("d.canal = :canal")
+        params["canal"] = canal
+    if busca:
+        filtros.append("(al.nome ILIKE :b OR rel.nome ILIKE :b OR u.nome ILIKE :b OR d.destino ILIKE :b)")
+        params["b"] = f"%{busca}%"
+    where = " AND ".join(filtros)
+    with engine.connect() as c:
+        total = c.execute(text(f"""
+            SELECT COUNT(*) FROM despachos d
+            LEFT JOIN alertas al ON al.id = d.alerta_id
+            LEFT JOIN relatorios rel ON rel.id = d.relatorio_id
+            LEFT JOIN usuarios u ON u.id = d.usuario_id
+            WHERE {where}
+        """), params).scalar() or 0
+        rows = c.execute(text(f"""
+            SELECT d.id, d.canal, d.destino, d.status, d.tentativas,
+                   d.enviar_apos, d.criado_em, d.ultimo_erro,
+                   al.nome AS alerta_nome, rel.nome AS relatorio_nome,
+                   u.nome AS usuario_nome
+            FROM despachos d
+            LEFT JOIN alertas al ON al.id = d.alerta_id
+            LEFT JOIN relatorios rel ON rel.id = d.relatorio_id
+            LEFT JOIN usuarios u ON u.id = d.usuario_id
+            WHERE {where}
+            ORDER BY d.criado_em DESC
+            LIMIT :lim OFFSET :off
+        """), params).mappings().all()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["criado_em_fmt"] = _fmt_dt(d["criado_em"])
+        d["enviar_apos_fmt"] = _fmt_dt(d.get("enviar_apos"))
+        d["recurso_nome"] = d.get("alerta_nome") or d.get("relatorio_nome") or "—"
+        d["recurso_tipo"] = "alerta" if d.get("alerta_nome") else ("relatorio" if d.get("relatorio_nome") else "—")
+        err = str(d.get("ultimo_erro") or "")
+        d["erro_resumo"] = (err[:60] + "…") if len(err) > 60 else err
+        result.append(d)
+    return result, total
+
+
+@router.get("/despachos", response_class=HTMLResponse)
+def admin_despachos_view(request: Request,
+                         status: str = Query(""),
+                         canal: str = Query(""),
+                         busca: str = Query(""),
+                         pagina: int = Query(1, ge=1)):
+    registros, total = _despachos_db(status, canal, busca, pagina)
+    return templates.TemplateResponse(request, "admin/despachos.html", {
+        "registros": registros, "total": total,
+        "status": status, "canal": canal, "busca": busca,
+        "pagina": pagina,
+        "total_paginas": max(1, -(-total // _DESP_POR_PAG)),
+    })
 
 
 # =============================================================================

@@ -19,7 +19,21 @@
     <form id="fedit{{ u.id }}"
           hx-post="/admin/usuarios/{{ u.id }}/salvar"
           hx-target="#row-u{{ u.id }}" hx-swap="outerHTML"
-          class="inline-flex gap-1.5">
+          class="inline-flex gap-1.5 flex-wrap items-center">
+      {# Silêncio #}
+      <label class="flex items-center gap-1 text-xs text-slate-500 cursor-pointer">
+        <input type="checkbox" name="silencio_ativo" value="true"
+               {% if u.silencio_ativo %}checked{% endif %}
+               class="rounded border-slate-300 text-indigo-600">
+        Silêncio
+      </label>
+      <input type="time" name="silencio_inicio" value="{{ u.silencio_inicio or '' }}"
+             title="Início silêncio" form="fedit{{ u.id }}"
+             class="w-24 px-1.5 py-1 text-xs border border-indigo-300 rounded focus:outline-none bg-indigo-50">
+      <span class="text-xs text-slate-400">→</span>
+      <input type="time" name="silencio_fim" value="{{ u.silencio_fim or '' }}"
+             title="Fim silêncio" form="fedit{{ u.id }}"
+             class="w-24 px-1.5 py-1 text-xs border border-indigo-300 rounded focus:outline-none bg-indigo-50">
       <button type="submit"
               class="px-3 py-1.5 text-xs rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
         Salvar

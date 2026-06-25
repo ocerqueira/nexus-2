@@ -104,6 +104,15 @@
           <td class="px-5 py-3">{{ badge(r.status, cor_st.get(r.status, "gray")) }}</td>
           <td class="px-5 py-3 text-xs text-slate-400">{{ r.ultimo_sync_fmt }}</td>
           <td class="px-5 py-3 text-right">
+            <button class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium
+                           bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200
+                           rounded-lg transition-colors mr-1"
+                    hx-get="/admin/relatorios/{{ r.id }}/destinatarios"
+                    hx-target="#drawer-body" hx-swap="innerHTML"
+                    data-drawer-title="Destinatários — {{ r.titulo }}"
+                    onclick="openDrawer(this.dataset.drawerTitle)">
+              Destinatários
+            </button>
             {% if r.status == "ativo" %}
             {{ btn_acao("Testar",
                 'hx-post="/admin/relatorios/' ~ r.id ~ '/disparar" hx-swap="outerHTML"',
