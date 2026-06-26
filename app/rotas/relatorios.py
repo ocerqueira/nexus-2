@@ -2,7 +2,11 @@
 Rotas de solicitação de relatórios.
 """
 
+import base64
+import importlib
+import json
 import logging
+from pathlib import Path as FilePath
 
 from fastapi import APIRouter, HTTPException, Path, Query
 from fastapi.responses import HTMLResponse, Response
@@ -10,15 +14,13 @@ from pydantic import BaseModel, Field
 
 from app.core.orquestrador_relatorios import orquestrar_relatorio
 from app.core.renderizador import gerar_pdf, renderizar_html
-from app.relatorios.dashboard_conexoes.processador import ProcessadorDashboardConexoes
-from app.relatorios.desempenho_vendas.processador import ProcessadorDesempenhoVendas
-from app.relatorios.itens_comprimento_por_carga.processador import ProcessadorItensComprimentoPorCarga
-from app.relatorios.pedidos_por_vendedor.processador import ProcessadorPedidosPorVendedor
-from app.relatorios.teste_conexoes.processador import ProcessadorTesteConexoes
+from app.core.resolvedor_parametros import resolver_tokens
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/relatorios", tags=["relatorios"])
+
+_PASTA_RELATORIOS = FilePath(__file__).parent.parent / "relatorios"
 
 
 class RequisicaoRelatorio(BaseModel):
@@ -27,33 +29,33 @@ class RequisicaoRelatorio(BaseModel):
     parametros: dict = Field(default_factory=dict)
 
 
-PROCESSADORES = {
-    "dashboard_conexoes": {
-        "classe": ProcessadorDashboardConexoes,
-        "titulo": "Dashboard de Conexões",
-        "subtitulo": "Visão consolidada com gráficos e estatísticas",
-    },
-    "teste_conexoes": {
-        "classe": ProcessadorTesteConexoes,
-        "titulo": "Teste de Conexões",
-        "subtitulo": "Catálogo de conexões cadastradas no Nexus",
-    },
-    "desempenho_vendas": {
-        "classe": ProcessadorDesempenhoVendas,
-        "titulo": "Desempenho de Vendas",
-        "subtitulo": "Dashboard de vendas por vendedor com metas e gráficos",
-    },
-    "pedidos_por_vendedor": {
-        "classe": ProcessadorPedidosPorVendedor,
-        "titulo": "Pedidos por Vendedor",
-        "subtitulo": "Ranking de vendedores com ticket médio e top 5 produtos",
-    },
-    "itens_comprimento_por_carga": {
-        "classe": ProcessadorItensComprimentoPorCarga,
-        "titulo": "Itens com Comprimento Excedente por Carga",
-        "subtitulo": "Consolidado por carga com pedido, item, cliente, vendedor e metragem",
-    },
-}
+def _carregar_relatorio(nome: str) -> dict | None:
+    """
+    Carrega dinamicamente o processador e config de um relatório pelo nome da pasta.
+    Retorna {classe, titulo, subtitulo} ou None se não encontrado.
+    Novo relatório = nova pasta em app/relatorios/ — sem mexer neste arquivo.
+    """
+    config_path = _PASTA_RELATORIOS / nome / "config.json"
+    if not config_path.exists():
+        return None
+
+    try:
+        mod = importlib.import_module(f"app.relatorios.{nome}.processador")
+    except ImportError:
+        return None
+
+    cfg = json.loads(config_path.read_text(encoding="utf-8"))
+
+    for attr_name in dir(mod):
+        attr = getattr(mod, attr_name)
+        if isinstance(attr, type) and attr_name.startswith("Processador") and attr_name != "Processador":
+            return {
+                "classe":    attr,
+                "titulo":    cfg.get("titulo", nome),
+                "subtitulo": cfg.get("subtitulo"),
+            }
+
+    return None
 
 
 @router.post("/{nome_relatorio}/solicitar")
@@ -78,23 +80,23 @@ def solicitar_relatorio(
     Os despachos são processados pelo workflow `nexus_despachos_sender` no N8N.
     """
     # 1. Validar formato
-    formatos_validos = ["json", "html", "pdf"]
+    formatos_validos = ["json", "html", "pdf", "base64"]
     if formato not in formatos_validos:
         raise HTTPException(
             status_code=400,
             detail=f"Formato inválido. Use: {formatos_validos}",
         )
 
-    # 2. Validar relatório
-    if nome_relatorio not in PROCESSADORES:
+    # 2. Carregar relatório dinamicamente
+    info_relatorio = _carregar_relatorio(nome_relatorio)
+    if not info_relatorio:
         raise HTTPException(
             status_code=404,
             detail=f"Relatório '{nome_relatorio}' não encontrado",
         )
 
-    # Extrair parâmetros (com fallback se body for vazio)
-    parametros = requisicao.parametros if requisicao else {}
-    info_relatorio = PROCESSADORES[nome_relatorio]
+    # Extrair parâmetros e resolver tokens dinâmicos ({{mes_anterior_inicio}}, etc.)
+    parametros = resolver_tokens(requisicao.parametros if requisicao else {})
 
     logger.info(
         f"Solicitação: relatorio={nome_relatorio} formato={formato} params={parametros}"
@@ -164,6 +166,64 @@ def solicitar_relatorio(
                 "Content-Disposition": f"attachment; filename={nome_relatorio}.pdf"
             },
         )
+
+    elif formato == "base64":
+        pdf = gerar_pdf(
+            nome_relatorio=nome_relatorio,
+            dados=dados,
+            titulo=info_relatorio["titulo"],
+            subtitulo=info_relatorio["subtitulo"],
+        )
+        resp = {
+            "status": "sucesso",
+            "relatorio": nome_relatorio,
+            "pdf_base64": base64.b64encode(pdf).decode(),
+            "filename": f"{nome_relatorio}.pdf",
+        }
+        if despachos_info:
+            resp["despachos"] = despachos_info
+        return resp
+
+
+@router.get("/{nome_relatorio}/config")
+def obter_config_relatorio(
+    nome_relatorio: str = Path(description="Nome técnico do relatório"),
+) -> dict:
+    """
+    Retorna o schema de parâmetros do relatório lido do config.json.
+
+    Usado pelo chatbot N8N para construir o fluxo de coleta dinamicamente
+    e pelo admin para renderizar campos no formulário de agendamento.
+
+    Inclui tokens dinâmicos suportados para referência.
+    """
+    config_path = _PASTA_RELATORIOS / nome_relatorio / "config.json"
+    if not config_path.exists():
+        raise HTTPException(status_code=404, detail=f"Relatório '{nome_relatorio}' não encontrado")
+
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+
+    return {
+        "nome": nome_relatorio,
+        "titulo": config.get("titulo", nome_relatorio),
+        "descricao": config.get("descricao"),
+        "categoria": config.get("categoria"),
+        "modo_execucao": config.get("modo_execucao", "unico"),
+        "parametros": config.get("parametros", []),
+        "tokens_disponiveis": [
+            {"token": "{{hoje}}", "descricao": "Data de hoje (AAAA-MM-DD)"},
+            {"token": "{{ontem}}", "descricao": "Ontem (AAAA-MM-DD)"},
+            {"token": "{{mes_atual_inicio}}", "descricao": "Primeiro dia do mês atual"},
+            {"token": "{{mes_atual_fim}}", "descricao": "Último dia do mês atual"},
+            {"token": "{{mes_anterior_inicio}}", "descricao": "Primeiro dia do mês anterior"},
+            {"token": "{{mes_anterior_fim}}", "descricao": "Último dia do mês anterior"},
+            {"token": "{{semana_atual_inicio}}", "descricao": "Segunda-feira da semana atual"},
+            {"token": "{{semana_atual_fim}}", "descricao": "Domingo da semana atual"},
+            {"token": "{{ano_atual}}", "descricao": "Ano corrente como número"},
+            {"token": "{{mes_atual}}", "descricao": "Mês corrente como número"},
+            {"token": "{{ano_anterior}}", "descricao": "Ano anterior como número"},
+        ],
+    }
 
 
 @router.get("")

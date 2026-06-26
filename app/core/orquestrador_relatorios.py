@@ -22,6 +22,7 @@ from sqlalchemy import text
 
 from app.bd import engine
 from app.core.renderizador import gerar_pdf, renderizar_html
+from app.core.resolvedor_parametros import resolver_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +149,32 @@ def _calcular_enviar_apos(dest: dict) -> datetime | None:
     if fim_hoje <= agora:
         fim_hoje += timedelta(days=1)
     return fim_hoje.replace(tzinfo=None)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Destinatários dinâmicos (grupos_por_destinatario)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _normalizar_dest_grupo(grupo: dict, canais_default: list[str]) -> dict:
+    """Converte um item de grupos_por_destinatario para o formato padrão de dest."""
+    dest = grupo.get("destinatario", {})
+    return {
+        "usuario_id":      dest.get("id"),
+        "nome":            dest.get("nome", ""),
+        "email":           dest.get("email"),
+        "whatsapp_numero": dest.get("whatsapp"),
+        "silencio_ativo":  False,
+        "silencio_inicio": None,
+        "silencio_fim":    None,
+        "canais":          dest.get("canais") or canais_default,
+        "formato_whatsapp": dest.get("formato_whatsapp", "documento"),
+        "filtro_parametros": None,
+    }
+
+
+def _chave_contato(dest: dict) -> str | None:
+    """Chave de dedup por contato: whatsapp ou email."""
+    return dest.get("whatsapp_numero") or dest.get("whatsapp") or dest.get("email")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -339,31 +366,102 @@ def orquestrar_relatorio(
             "silencio_ativo": False, "silencio_inicio": None, "silencio_fim": None,
         }]
 
+    parametros = resolver_tokens(parametros)
+
     modo_execucao = relatorio.get("modo_execucao", "unico")
     despachos_criados: list[dict] = []
 
     historico_id = _registrar_historico(relatorio, parametros, 0)
 
     if modo_execucao == "unico":
-        # Uma execução → N envios
+        # Uma execução → verificar se processador retorna grupos_por_destinatario
         processador = processador_classe()
         dados = processador.buscar_dados(parametros)
         resumo = dados.get("resumo", "")
-        # Só gera PDF se algum destinatário usa email (WP busca via endpoint)
-        precisa_pdf = any("email" in (d.get("canais") or []) for d in todos_dests)
-        pdf_bytes = _gerar_e_comprimir(nome_relatorio, dados, titulo, subtitulo, comprimir_pdf) if precisa_pdf else None
+        grupos = dados.get("grupos_por_destinatario", [])
 
-        for dest in todos_dests:
-            despachos_criados.extend(_despachar_relatorio(
-                historico_id, relatorio["id"], dest, pdf_bytes, resumo,
-            ))
+        if grupos:
+            # Grupos dinâmicos: cada destinatário recebe seu próprio PDF filtrado.
+            # Destinatários fixos que já estão nos grupos recebem o slice deles,
+            # não o relatório completo — dedup por contato.
+            contatos_em_grupos = {
+                _chave_contato({"whatsapp_numero": g["destinatario"].get("whatsapp"),
+                                 "email": g["destinatario"].get("email")})
+                for g in grupos if g.get("destinatario")
+            } - {None}
+
+            dest_full = [d for d in todos_dests if _chave_contato(d) not in contatos_em_grupos]
+
+            # Modo teste: substitui destinatários dos grupos pelo destino de teste
+            if modo_teste:
+                grupos = [{
+                    **g,
+                    "destinatario": {
+                        "nome": "[TESTE]",
+                        "whatsapp": test_whatsapp,
+                        "email": test_email,
+                    }
+                } for g in grupos[:1]]
+
+            # Relatório completo para destinatários fixos não cobertos por grupos
+            if dest_full:
+                precisa_pdf_full = any(
+                    "email" in (d.get("canais") or []) or d.get("formato_whatsapp", "documento") == "documento"
+                    for d in dest_full
+                )
+                pdf_full = _gerar_e_comprimir(nome_relatorio, dados, titulo, subtitulo, comprimir_pdf) if precisa_pdf_full else None
+                for dest in dest_full:
+                    despachos_criados.extend(_despachar_relatorio(
+                        historico_id, relatorio["id"], dest, pdf_full, resumo,
+                    ))
+
+            # PDF individual por grupo
+            for grupo in grupos:
+                dest_g = _normalizar_dest_grupo(grupo, canais_default)
+                dados_g = grupo.get("dados") or dados
+                resumo_g = grupo.get("resumo") or resumo
+
+                precisa_pdf_g = (
+                    "email" in (dest_g.get("canais") or []) or
+                    dest_g.get("formato_whatsapp", "documento") == "documento"
+                )
+                try:
+                    pdf_g = _gerar_e_comprimir(nome_relatorio, dados_g, titulo, subtitulo, comprimir_pdf) if precisa_pdf_g else None
+                except Exception as e:
+                    logger.error(f"Erro ao gerar PDF para grupo {dest_g.get('nome')}: {e}")
+                    continue
+
+                despachos_criados.extend(_despachar_relatorio(
+                    historico_id, relatorio["id"], dest_g, pdf_g, resumo_g,
+                ))
+
+            logger.info(
+                f"[{nome_relatorio}] grupos_por_destinatario: {len(grupos)} grupos + "
+                f"{len(dest_full)} fixos"
+            )
+
+        else:
+            # Fluxo padrão: 1 execução → mesmo PDF para todos os fixos
+            precisa_pdf = any(
+                "email" in (d.get("canais") or []) or d.get("formato_whatsapp", "documento") == "documento"
+                for d in todos_dests
+            )
+            pdf_bytes = _gerar_e_comprimir(nome_relatorio, dados, titulo, subtitulo, comprimir_pdf) if precisa_pdf else None
+
+            for dest in todos_dests:
+                despachos_criados.extend(_despachar_relatorio(
+                    historico_id, relatorio["id"], dest, pdf_bytes, resumo,
+                ))
 
     else:
         # por_destinatario: execução separada por destinatário usando filtro_parametros
         for dest in todos_dests:
             filtro = dest.get("filtro_parametros") or {}
             params_dest = {**parametros, **filtro}
-            precisa_pdf = "email" in (dest.get("canais") or [])
+            precisa_pdf = (
+                "email" in (dest.get("canais") or []) or
+                dest.get("formato_whatsapp", "documento") == "documento"
+            )
 
             try:
                 processador = processador_classe()
@@ -419,12 +517,12 @@ def _despachar_relatorio(
         if canal == "whatsapp":
             fmt = dest.get("formato_whatsapp", "documento")
             if fmt == "resumo_texto":
-                payload = {"mensagem": resumo or "Relatório gerado. Sem resumo disponível."}
+                payload = {"tipo": "texto", "mensagem": resumo or "Relatório gerado."}
             else:
-                # N8N busca o PDF via GET /relatorios/{nome}/solicitar?formato=pdf
                 payload = {
                     "tipo": "pdf",
                     "text": resumo or "Documento",
+                    "pdf_base64": base64.b64encode(pdf_bytes).decode() if pdf_bytes else None,
                 }
             destino = dest.get("whatsapp_numero") or ""
 

@@ -29,15 +29,18 @@
     {
       "parameters": {
         "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
           "conditions": [
-            { "leftValue": "={{ $json.skip }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }
-          ]
-        }
+            { "id": "c1", "leftValue": "={{ $json.skip }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
       "id": "if-skip",
       "name": "IF — skip?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
+      "typeVersion": 2.2,
       "position": [700, 300]
     },
     {
@@ -52,6 +55,10 @@
       "parameters": {
         "method": "GET",
         "url": "={{ $env.NEXUS_URL }}/chatbot/sessao/{{ $json.numero }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-Api-Key", "value": "={{ $env.NEXUS_API_KEY }}" }
+        ]},
         "options": { "ignore400": true }
       },
       "id": "get-sessao",
@@ -74,6 +81,10 @@
       "parameters": {
         "method": "PUT",
         "url": "={{ $env.NEXUS_URL }}/chatbot/sessao/{{ $json.numero }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-Api-Key", "value": "={{ $env.NEXUS_API_KEY }}" }
+        ]},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.novo_estado) }}",
@@ -97,21 +108,23 @@
     },
     {
       "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.next_action }}",
         "rules": {
           "rules": [
-            { "conditions": { "conditions": [{ "leftValue": "={{ $json.next_action }}", "rightValue": "send_menu", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "menu" },
-            { "conditions": { "conditions": [{ "leftValue": "={{ $json.next_action }}", "rightValue": "send_periodo", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "periodo" },
-            { "conditions": { "conditions": [{ "leftValue": "={{ $json.next_action }}", "rightValue": "send_texto", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "texto" },
-            { "conditions": { "conditions": [{ "leftValue": "={{ $json.next_action }}", "rightValue": "call_relatorio", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "relatorio" },
-            { "conditions": { "conditions": [{ "leftValue": "={{ $json.next_action }}", "rightValue": "call_alerta", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "alerta" }
+            { "value2": "send_menu" },
+            { "value2": "send_periodo" },
+            { "value2": "send_texto" },
+            { "value2": "call_relatorio" },
+            { "value2": "call_alerta" }
           ]
         },
-        "options": {}
+        "fallbackOutput": "none"
       },
       "id": "switch",
       "name": "Switch — next_action",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
+      "typeVersion": 1,
       "position": [1800, 380]
     },
     {
@@ -200,6 +213,10 @@
         "url": "={{ $env.NEXUS_URL }}/relatorios/{{ $json.recurso_nome }}/solicitar",
         "sendQuery": true,
         "queryParameters": { "parameters": [{ "name": "formato", "value": "pdf" }] },
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-Api-Key", "value": "={{ $env.NEXUS_API_KEY }}" }
+        ]},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={ \"parametros\": {{ JSON.stringify($json.parametros) }} }",
@@ -213,7 +230,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const src = $('Code — state machine').item.json;\nconst binData = $input.first().binary?.data;\nif (!binData) {\n  return [{ _tipo:'texto', numero: src.numero, mensagem: '❌ Erro ao gerar o relatório. Tente novamente ou digite *menu*.' }];\n}\nconst b64 = 'data:application/pdf;base64,' + Buffer.from(binData).toString('base64');\nconst p = src.parametros || {};\nconst periodo = (p.data_inicio && p.data_fim) ? `${p.data_inicio} a ${p.data_fim}` : 'período selecionado';\nconst nome_fmt = (src.recurso_nome||'relatório').replace(/_/g,' ');\nreturn [{ _tipo:'pdf', numero: src.numero, base64: b64, caption: `📊 *${nome_fmt}* — ${periodo}` }];"
+        "jsCode": "const src = $('Code — state machine').item.json;\nconst binData = $input.first().binary?.data;\nif (!binData) {\n  return [{ _tipo:'texto', numero: src.numero, mensagem: '❌ Erro ao gerar o relatório. Tente novamente ou digite *menu*.' }];\n}\nconst b64 = Buffer.from(binData).toString('base64');\nconst p = src.parametros || {};\nconst periodo = (p.data_inicio && p.data_fim) ? `${p.data_inicio} a ${p.data_fim}` : 'período selecionado';\nconst nome_fmt = (src.recurso_nome||'relatório').replace(/_/g,' ');\nreturn [{ _tipo:'pdf', numero: src.numero, base64: b64, caption: `📊 *${nome_fmt}* — ${periodo}` }];"
       },
       "id": "preparar-pdf",
       "name": "Code — preparar PDF",
@@ -245,6 +262,10 @@
       "parameters": {
         "method": "POST",
         "url": "={{ $env.NEXUS_URL }}/alertas/{{ $json.recurso_nome }}/verificar",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-Api-Key", "value": "={{ $env.NEXUS_API_KEY }}" }
+        ]},
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={ \"parametros\": {{ JSON.stringify($json.parametros) }} }",

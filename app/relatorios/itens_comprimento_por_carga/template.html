@@ -3,12 +3,12 @@
 {% block page_css %}
     @page {
         size: 297mm 210mm;
-        margin: 2.45cm 1.1cm 1.45cm 1.1cm;
+        margin: 2.45cm 0.55cm 1.45cm 0.55cm;
         @top-left   { content: none; width: 0; }
         @top-right  { content: none; width: 0; }
         @top-center {
             content: element(cabecalho-slim);
-            vertical-align: bottom;
+            vertical-align: top;
         }
         @bottom-left {
             content: "Página " counter(page) " de " counter(pages);
@@ -31,7 +31,7 @@
         }
     }
     @page :first {
-        margin-top: 0;
+        margin-top: 0.55cm;
         @top-center { content: none; }
     }
 {% endblock %}
@@ -55,8 +55,9 @@
     body {
         font-family: 'Gotham', 'Montserrat', 'Century Gothic', Arial, sans-serif;
         color: var(--preto);
-        font-size: 9pt;
+        font-size: 10pt;
         hyphens: none;
+        padding: 0;
     }
 
     .rodape { display: none; }
@@ -92,7 +93,7 @@
         box-sizing: border-box;
         background: var(--preto);
         border-bottom: 3px solid var(--amarelo);
-        padding: 14px 1.1cm;
+        padding: 14px 0.55cm;
         border-radius: 1px 1px 0 0;
     }
     .cab-info  { flex: 1; text-align: left; }
@@ -130,7 +131,7 @@
     }
     .doc-params {
         margin-top: 10px;
-        font-size: 7.5pt;
+        font-size: 8.5pt;
         color: var(--cinza-claro);
         line-height: 1.35;
     }
@@ -141,26 +142,30 @@
     .running-header-slim { position: running(cabecalho-slim); display: block; }
 
     .cab-slim {
-        display: flex;
-        align-items: center;
+        display: table;
+        table-layout: fixed;
         width: 100%;
         box-sizing: border-box;
-        background: var(--preto);
+        padding: 0.55cm 0 4px;
         border-bottom: 2px solid var(--amarelo);
-        padding: 4px 12px;
     }
     .cab-slim-titulo {
-        flex: 1;
+        display: table-cell;
+        text-align: left;
         font-size: 8pt;
         font-weight: 700;
-        color: #FFFFFF;
+        color: var(--preto-2);
         text-transform: uppercase;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.4px;
+        vertical-align: baseline;
     }
     .cab-slim-params {
-        font-size: 7pt;
-        color: var(--cinza-claro);
+        display: table-cell;
+        text-align: right;
+        font-size: 7.5pt;
+        color: var(--cinza);
         white-space: nowrap;
+        vertical-align: baseline;
     }
     .cab-slim-params .lbl { color: var(--amarelo); font-weight: 700; }
 
@@ -208,7 +213,7 @@
     .carga-numero {
         font-size: 10pt;
         font-weight: 800;
-        color: var(--amarelo);
+        color: var(--laranja);
         white-space: nowrap;
         padding-right: 14px;
     }
@@ -223,19 +228,19 @@
     }
     .carga-meta {
         text-align: right;
-        font-size: 7.5pt;
+        font-size: 8.5pt;
         color: var(--cinza);
         white-space: nowrap;
         padding: 0 14px;
     }
-    .carga-meta .lbl { color: var(--amarelo); font-weight: 700; }
+    .carga-meta .lbl { color: var(--laranja); font-weight: 700; }
     .badge-contagem {
         display: inline-block;
         background: var(--laranja);
         color: #FFFFFF;
         border-radius: 10px;
         padding: 2px 10px;
-        font-size: 7.5pt;
+        font-size: 8.5pt;
         font-weight: 700;
         white-space: nowrap;
     }
@@ -247,13 +252,13 @@
         border-collapse: separate;
         border-spacing: 0;
         table-layout: fixed;
-        font-size: 8.5pt;
+        font-size: 9.5pt;
     }
     .carga-tabela th {
         background: var(--fundo-th);
         color: var(--preto-2);
         font-weight: 700;
-        font-size: 7pt;
+        font-size: 8pt;
         letter-spacing: 0.6px;
         text-transform: uppercase;
         padding: 5px 12px;
@@ -281,7 +286,7 @@
     }
     .col-excedente {
         text-align: right;
-        font-size: 7.5pt;
+        font-size: 8.5pt;
         font-weight: 700;
         color: var(--laranja);
         white-space: nowrap;
@@ -296,7 +301,7 @@
         display: inline-block;
         padding: 1px 7px;
         border-radius: 1px;
-        font-size: 6.5pt;
+        font-size: 7.5pt;
         font-weight: 800;
         letter-spacing: 0.5px;
     }
@@ -335,12 +340,10 @@
 {# Cabeçalho slim — páginas 2+ #}
 <div class="running-header-slim">
     <div class="cab-slim">
-        <div class="cab-slim-titulo">{{ titulo }}</div>
-        <div class="cab-slim-params">
-            {% if periodo is defined and periodo %}
-            <span class="lbl">PERÍODO</span> {{ periodo }}
-            {% endif %}
-        </div>
+        <span class="cab-slim-titulo">{{ titulo }} · {{ subtitulo or 'VOTUPORANGA' }}</span>
+        {% if periodo is defined and periodo %}
+        <span class="cab-slim-params"><span class="lbl">PERÍODO</span> {{ periodo }}</span>
+        {% endif %}
     </div>
 </div>
 
@@ -379,7 +382,6 @@
                 <th>Produto</th>
                 <th style="width:18%">Cliente</th>
                 <th style="width:14%">Vendedor</th>
-                <th style="width:8%" class="col-c">Tipo</th>
                 <th style="width:11%" class="col-num">Comprimento</th>
                 <th style="width:9%" class="col-num">Excede em</th>
             </tr>
@@ -392,13 +394,6 @@
                 <td class="produto-cel" title="{{ item.produto }}">{{ item.produto }}</td>
                 <td>{{ item.nome_cliente or item.codigo_cliente }}</td>
                 <td>{{ item.nome_vendedor }}</td>
-                <td class="col-c">
-                    {% if item.origem_medida == 'TELHA' %}
-                    <span class="badge-tipo badge-telha">TELHA</span>
-                    {% else %}
-                    <span class="badge-tipo badge-sbx">SBX</span>
-                    {% endif %}
-                </td>
                 <td class="col-comprimento">{{ item.comprimento_m }}m</td>
                 <td class="col-excedente">+{{ item.excedente_m }}m</td>
             </tr>

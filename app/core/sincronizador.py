@@ -85,19 +85,22 @@ def _sincronizar_relatorios() -> dict:
             categoria = config.get("categoria")
             agora = datetime.now()
 
+            modo_execucao = config.get("modo_execucao", "unico")
+
             if nome not in existentes:
                 conexao.execute(
                     text("""
                         INSERT INTO relatorios
-                            (nome, titulo, descricao, categoria, status, ultimo_sync)
+                            (nome, titulo, descricao, categoria, modo_execucao, status, ultimo_sync)
                         VALUES
-                            (:nome, :titulo, :descricao, :categoria, 'ativo', :ultimo_sync)
+                            (:nome, :titulo, :descricao, :categoria, :modo_execucao, 'ativo', :ultimo_sync)
                     """),
                     {
                         "nome": nome,
                         "titulo": titulo,
                         "descricao": descricao,
                         "categoria": categoria,
+                        "modo_execucao": modo_execucao,
                         "ultimo_sync": agora,
                     },
                 )
@@ -114,6 +117,7 @@ def _sincronizar_relatorios() -> dict:
                             SET titulo = :titulo,
                                 descricao = :descricao,
                                 categoria = :categoria,
+                                modo_execucao = :modo_execucao,
                                 status = 'ativo',
                                 removido_em = NULL,
                                 ultimo_sync = :ultimo_sync
@@ -124,6 +128,7 @@ def _sincronizar_relatorios() -> dict:
                             "titulo": titulo,
                             "descricao": descricao,
                             "categoria": categoria,
+                            "modo_execucao": modo_execucao,
                             "ultimo_sync": agora,
                         },
                     )
@@ -137,6 +142,7 @@ def _sincronizar_relatorios() -> dict:
                             SET titulo = :titulo,
                                 descricao = :descricao,
                                 categoria = :categoria,
+                                modo_execucao = :modo_execucao,
                                 ultimo_sync = :ultimo_sync
                             WHERE nome = :nome
                         """),
@@ -145,6 +151,7 @@ def _sincronizar_relatorios() -> dict:
                             "titulo": titulo,
                             "descricao": descricao,
                             "categoria": categoria,
+                            "modo_execucao": modo_execucao,
                             "ultimo_sync": agora,
                         },
                     )
@@ -202,21 +209,23 @@ def _sincronizar_alertas() -> dict:
             titulo = config.get("titulo", nome)
             descricao = config.get("descricao", "")
             severidade = config.get("severidade", "info")
+            cooldown_minutos = config.get("cooldown_minutos", 60)
             agora = datetime.now()
 
             if nome not in existentes:
                 conexao.execute(
                     text("""
                         INSERT INTO alertas
-                            (nome, titulo, descricao, severidade, status, ultimo_sync)
+                            (nome, titulo, descricao, severidade, cooldown_minutos, status, ultimo_sync)
                         VALUES
-                            (:nome, :titulo, :descricao, :severidade, 'ativo', :ultimo_sync)
+                            (:nome, :titulo, :descricao, :severidade, :cooldown_minutos, 'ativo', :ultimo_sync)
                     """),
                     {
                         "nome": nome,
                         "titulo": titulo,
                         "descricao": descricao,
                         "severidade": severidade,
+                        "cooldown_minutos": cooldown_minutos,
                         "ultimo_sync": agora,
                     },
                 )
@@ -233,6 +242,7 @@ def _sincronizar_alertas() -> dict:
                             SET titulo = :titulo,
                                 descricao = :descricao,
                                 severidade = :severidade,
+                                cooldown_minutos = :cooldown_minutos,
                                 status = 'ativo',
                                 removido_em = NULL,
                                 ultimo_sync = :ultimo_sync
@@ -243,6 +253,7 @@ def _sincronizar_alertas() -> dict:
                             "titulo": titulo,
                             "descricao": descricao,
                             "severidade": severidade,
+                            "cooldown_minutos": cooldown_minutos,
                             "ultimo_sync": agora,
                         },
                     )
@@ -256,6 +267,7 @@ def _sincronizar_alertas() -> dict:
                             SET titulo = :titulo,
                                 descricao = :descricao,
                                 severidade = :severidade,
+                                cooldown_minutos = :cooldown_minutos,
                                 ultimo_sync = :ultimo_sync
                             WHERE nome = :nome
                         """),
@@ -264,6 +276,7 @@ def _sincronizar_alertas() -> dict:
                             "titulo": titulo,
                             "descricao": descricao,
                             "severidade": severidade,
+                            "cooldown_minutos": cooldown_minutos,
                             "ultimo_sync": agora,
                         },
                     )

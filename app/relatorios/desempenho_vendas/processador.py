@@ -29,7 +29,7 @@ from app.core.gerenciador_conexoes import gerenciador_conexoes
 
 ARQUIVO_CONSULTAS = Path(__file__).parent / "consultas.sql"
 CONEXAO_ERP = "REPLICA_TERRA"
-CONEXAO_METAS = "testes"
+CONEXAO_METAS = "nexus_metas"
 
 matplotlib.use("Agg")
 plt.style.use("seaborn-v0_8-whitegrid")
@@ -180,6 +180,9 @@ class ProcessadorDesempenhoVendas:
             df_metas = pd.DataFrame(linhas_metas)
             if not df_metas.empty:
                 df_metas.columns = [c.lower() for c in df_metas.columns]
+                for col in ("meta_valor", "meta_pedidos"):
+                    if col in df_metas.columns:
+                        df_metas[col] = pd.to_numeric(df_metas[col], errors="coerce").fillna(0)
         except Exception:
             df_metas = pd.DataFrame()
 
@@ -212,11 +215,12 @@ class ProcessadorDesempenhoVendas:
                 )
                 df_merged = df_merged.drop(columns=["nome_vendedor_meta"])
 
-            # Preenche meta_valor ausente com 0
-            if "meta_valor" in df_merged.columns:
-                df_merged["meta_valor"] = df_merged["meta_valor"].fillna(0)
-            else:
-                df_merged["meta_valor"] = 0
+            # Preenche colunas de meta ausentes (vendedores sem meta cadastrada)
+            for col, default in [("meta_valor", 0), ("meta_pedidos", 0)]:
+                if col in df_merged.columns:
+                    df_merged[col] = pd.to_numeric(df_merged[col], errors="coerce").fillna(default)
+                else:
+                    df_merged[col] = default
 
             df_merged["atingimento_pct"] = np.where(
                 df_merged["meta_valor"] > 0,
@@ -270,7 +274,7 @@ class ProcessadorDesempenhoVendas:
             "acima_meta": acima_meta,
             "abaixo_meta": abaixo_meta,
             "top3": top3,
-            "vendedores": df_merged.to_dict("records") if not df_merged.empty else [],
+            "vendedores": df_merged.where(df_merged.notna(), other=None).to_dict("records") if not df_merged.empty else [],
             "grafico_vendas_meta": grafico_vendas_meta,
             "grafico_tendencia": grafico_tendencia,
             "periodo": f"{mes:02d}/{ano}",

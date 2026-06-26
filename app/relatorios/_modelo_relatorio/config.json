@@ -1,7 +1,8 @@
 {
   "titulo": "Nome do Relatório",
-  "descricao": "Descreva aqui o que este relatório mostra, quais fontes usa e para quem se destina. Ex: dashboard de desempenho por categoria com metas, gráficos e ranking.",
+  "descricao": "Descreva aqui o que este relatório mostra, quais fontes usa e para quem se destina.",
   "categoria": "operacional",
+  "modo_execucao": "unico",
   "parametros": [
     {
       "nome": "cod_empresa",
@@ -9,20 +10,27 @@
       "obrigatorio": false,
       "padrao": 1,
       "rotulo": "Código da empresa"
-    },
-    {
-      "nome": "ano",
-      "tipo": "integer",
-      "obrigatorio": false,
-      "padrao": 2026,
-      "rotulo": "Ano de referência"
-    },
-    {
-      "nome": "mes",
-      "tipo": "integer",
-      "obrigatorio": false,
-      "padrao": 6,
-      "rotulo": "Mês de referência (1-12)"
     }
-  ]
+  ],
+  "_doc_grupos_por_destinatario": {
+    "descricao": "Quando buscar_dados() retorna grupos_por_destinatario, o orquestrador gera um PDF por destinatário dinâmico. Útil para relatórios onde os destinatários e seus dados vêm da própria query (ex: cada vendedor recebe só seus pedidos).",
+    "contrato": {
+      "grupos_por_destinatario": [
+        {
+          "destinatario": {
+            "nome": "João Silva",
+            "whatsapp": "5517999999999",
+            "email": "joao@empresa.com"
+          },
+          "dados": "{ mesma estrutura de dados, filtrada para este destinatário }",
+          "resumo": "Texto personalizado para este destinatário (opcional)"
+        }
+      ]
+    },
+    "comportamento": [
+      "Destinatários fixos (relatorios_destinatarios) que NÃO estão nos grupos recebem o relatório completo.",
+      "Destinatários fixos que JÁ estão nos grupos recebem o slice deles (dedup por whatsapp/email).",
+      "Modo teste: apenas o primeiro grupo é processado, destinatário substituído pelo contato de teste."
+    ]
+  }
 }

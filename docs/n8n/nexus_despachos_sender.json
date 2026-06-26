@@ -1,213 +1,152 @@
 {
-  "name": "Nexus — Despachos Sender (fila unificada alertas + relatórios)",
+  "name": "Nexus — Despachos Sender",
+  "_info": {
+    "n8n": "1.122.5",
+    "evolution": "2.3.3 (exchange)",
+    "nexus": "payload autossuficiente — sem re-fetch de PDF"
+  },
   "nodes": [
+
     {
-      "parameters": {
-        "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "* * * * *" }]
-        }
-      },
       "id": "schedule",
       "name": "Cron — a cada minuto",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 300]
+      "position": [0, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "* * * * *" }]
+        }
+      }
     },
 
     {
-      "parameters": {
-        "mode": "manual",
-        "assignments": {
-          "assignments": [
-            { "id": "a1", "name": "NEXUS_URL",           "value": "http://192.168.1.100:8000", "type": "string" },
-            { "id": "a2", "name": "NEXUS_API_KEY",        "value": "sua_chave_nexus",           "type": "string" },
-            { "id": "a3", "name": "EVOLUTION_URL",        "value": "https://api.sua-evolution.com", "type": "string" },
-            { "id": "a4", "name": "EVOLUTION_INSTANCE",   "value": "minha_instancia",           "type": "string" },
-            { "id": "a5", "name": "EVOLUTION_API_KEY",    "value": "sua_chave_evolution",       "type": "string" },
-            { "id": "a6", "name": "SMTP_HOST",            "value": "smtp.gmail.com",            "type": "string" },
-            { "id": "a7", "name": "SMTP_PORT",            "value": 587,                         "type": "number" },
-            { "id": "a8", "name": "SMTP_USER",            "value": "seu-email@gmail.com",       "type": "string" },
-            { "id": "a9", "name": "SMTP_PASSWORD",        "value": "xxxx xxxx xxxx xxxx",       "type": "string" },
-            { "id": "a10","name": "SMTP_FROM_NAME",       "value": "Nexus Alertas",             "type": "string" }
-          ]
-        },
-        "options": {}
-      },
       "id": "config",
       "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [250, 300]
-    },
-
-    {
+      "position": [220, 300],
       "parameters": {
-        "method": "GET",
-        "url": "={{ $json.NEXUS_URL }}/despachos/pendentes?limite=50",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "X-API-Key", "value": "={{ $json.NEXUS_API_KEY }}" }
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            { "id": "a1",  "name": "NEXUS_URL",         "value": "http://192.168.1.100:8099",    "type": "string" },
+            { "id": "a2",  "name": "NEXUS_API_KEY",      "value": "sua_chave_nexus",              "type": "string" },
+            { "id": "a3",  "name": "EVOLUTION_URL",      "value": "https://api.evolution.com",   "type": "string" },
+            { "id": "a4",  "name": "EVOLUTION_INSTANCE", "value": "minha_instancia",             "type": "string" },
+            { "id": "a5",  "name": "EVOLUTION_API_KEY",  "value": "sua_chave_evolution",         "type": "string" },
+            { "id": "a6",  "name": "SMTP_HOST",          "value": "smtp.gmail.com",              "type": "string" },
+            { "id": "a7",  "name": "SMTP_PORT",          "value": 587,                           "type": "number" },
+            { "id": "a8",  "name": "SMTP_USER",          "value": "seu-email@gmail.com",         "type": "string" },
+            { "id": "a9",  "name": "SMTP_PASSWORD",      "value": "xxxx xxxx xxxx xxxx",         "type": "string" },
+            { "id": "a10", "name": "SMTP_FROM_NAME",     "value": "Nexus",                       "type": "string" }
           ]
         },
         "options": {}
-      },
+      }
+    },
+
+    {
       "id": "get-pendentes",
       "name": "GET — despachos/pendentes",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 300]
+      "position": [440, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.NEXUS_URL }}/despachos/pendentes?limite=50&incluir_retry=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "={{ $json.NEXUS_API_KEY }}" }
+          ]
+        },
+        "options": {}
+      }
     },
 
     {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true },
-          "conditions": [
-            {
-              "id": "cond-total",
-              "leftValue": "={{ $json.total }}",
-              "rightValue": 0,
-              "operator": { "type": "number", "operation": "gt" }
-            }
-          ]
-        }
-      },
       "id": "if-tem",
-      "name": "IF — tem_despachos?",
+      "name": "IF — tem despachos?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [750, 300]
+      "position": [660, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{
+            "id": "c1",
+            "leftValue": "={{ $json.total }}",
+            "rightValue": 0,
+            "operator": { "type": "number", "operation": "gt" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      }
     },
 
     {
-      "parameters": {
-        "fieldToSplitOut": "despachos",
-        "options": {}
-      },
       "id": "split",
       "name": "Split Out — despachos",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [1000, 300]
+      "position": [880, 300],
+      "parameters": {
+        "fieldToSplitOut": "despachos",
+        "options": {}
+      }
     },
 
     {
+      "id": "if-canal-wp",
+      "name": "IF — canal whatsapp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1100, 300],
       "parameters": {
-        "dataType": "string",
-        "value1": "={{ $json.canal }}",
-        "rules": {
-          "rules": [
-            { "value2": "whatsapp" },
-            { "value2": "email" },
-            { "value2": "sms" }
-          ]
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{
+            "id": "c1",
+            "leftValue": "={{ $json.canal }}",
+            "rightValue": "whatsapp",
+            "operator": { "type": "string", "operation": "equals" }
+          }],
+          "combinator": "and"
         },
-        "fallbackOutput": "none"
-      },
-      "id": "switch-canal",
-      "name": "Switch — canal",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 1,
-      "position": [1250, 300]
+        "options": {}
+      }
     },
 
     {
+      "id": "if-tipo-pdf",
+      "name": "IF — tipo pdf?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 180],
       "parameters": {
-        "jsCode": "// Decide se é texto simples ou documento (PDF)\nconst despacho = $input.first().json;\nconst payload = typeof despacho.payload === 'string'\n  ? JSON.parse(despacho.payload)\n  : despacho.payload;\n\n// media: base64 legado OU novo tipo=pdf\nconst tipo = (payload.documento_base64 || payload.tipo === 'pdf') ? 'media' : 'texto';\n\nreturn [{\n  json: { ...despacho, _payload: payload, _tipo_wp: tipo },\n  pairedItem: { item: 0 }\n}];"
-      },
-      "id": "code-wp-tipo",
-      "name": "Code — tipo WhatsApp",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1500, 160]
-    },
-
-    {
-      "parameters": {
-        "dataType": "string",
-        "value1": "={{ $json._tipo_wp }}",
-        "rules": {
-          "rules": [
-            { "value2": "texto" },
-            { "value2": "media" }
-          ]
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{
+            "id": "c1",
+            "leftValue": "={{ $json.payload.tipo }}",
+            "rightValue": "pdf",
+            "operator": { "type": "string", "operation": "equals" }
+          }],
+          "combinator": "and"
         },
-        "fallbackOutput": "none"
-      },
-      "id": "switch-wp-tipo",
-      "name": "Switch — WhatsApp tipo",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 1,
-      "position": [1750, 160]
+        "options": {}
+      }
     },
 
     {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $('Config').first().json.EVOLUTION_URL + '/message/sendText/' + $('Config').first().json.EVOLUTION_INSTANCE }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $json.destino, text: $json._payload.mensagem }) }}",
-        "options": { "allowUnauthorizedCerts": true }
-      },
-      "id": "evo-sendtext",
-      "name": "Evolution — sendText",
+      "id": "evo-sendmedia",
+      "name": "Evolution — sendMedia",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2000, 60],
-      "continueOnFail": true
-    },
-
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $('Config').first().json.NEXUS_URL + '/relatorios/' + $json.relatorio_nome + '/solicitar?formato=pdf' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "X-API-Key", "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file",
-              "outputPropertyName": "data"
-            }
-          }
-        }
-      },
-      "id": "http-buscar-pdf",
-      "name": "HTTP — buscar PDF Nexus",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2000, 260],
-      "continueOnFail": true
-    },
-
-    {
-      "parameters": {
-        "jsCode": "// Lê o binário PDF retornado pelo HTTP node e monta payload para sendMedia\nconst item = $input.first();\nconst despacho = $('Code — tipo WhatsApp').item.json;\n\nconst bin = item.binary?.data;\nif (!bin?.data) {\n  const errInfo = JSON.stringify(item.json?.error || item.json || 'sem dados');\n  throw new Error(`PDF não recebido (despacho ${despacho.id}): ${errInfo.slice(0,200)}`);\n}\n\nconst mime = bin.mimeType || 'application/pdf';\nconst payload = despacho._payload || {};\n\nreturn [{\n  json: {\n    ...despacho,\n    _media_base64:   `data:${mime};base64,${bin.data}`,\n    _media_text:     payload.text || payload.caption || 'Documento',\n    _media_filename: (despacho.relatorio_nome || despacho.alerta_nome || 'relatorio') + '.pdf'\n  },\n  pairedItem: { item: 0 }\n}];"
-      },
-      "id": "code-preparar-sendmedia",
-      "name": "Code — preparar sendMedia",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [2125, 260]
-    },
-
-    {
+      "position": [1540, 80],
+      "continueOnFail": true,
       "parameters": {
         "method": "POST",
         "url": "={{ $('Config').first().json.EVOLUTION_URL + '/message/sendMedia/' + $('Config').first().json.EVOLUTION_INSTANCE }}",
@@ -219,91 +158,113 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $json.destino, mediatype: 'document', mimetype: 'application/pdf', text: $json._media_text || 'Documento', media: $json._media_base64, fileName: $json._media_filename || 'relatorio.pdf' }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $json.destino, mediatype: 'document', mimetype: 'application/pdf', media: $json.payload.pdf_base64, fileName: ($json.relatorio_nome || $json.alerta_nome || 'nexus') + '.pdf', text: $json.payload.text || 'Documento' }) }}",
         "options": { "allowUnauthorizedCerts": true }
-      },
-      "id": "evo-sendmedia",
-      "name": "Evolution — sendMedia",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2250, 260],
-      "continueOnFail": true
+      }
     },
 
     {
+      "id": "evo-sendtext",
+      "name": "Evolution — sendText",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 280],
+      "continueOnFail": true,
       "parameters": {
-        "jsCode": "// Prepara email: suporta HTML puro ou PDF em anexo\nconst despacho = $input.first().json;\nconst payload = typeof despacho.payload === 'string'\n  ? JSON.parse(despacho.payload)\n  : despacho.payload;\n\nreturn [{\n  json: {\n    ...despacho,\n    _payload: payload,\n    _tem_pdf: !!payload.pdf_base64\n  },\n  pairedItem: { item: 0 }\n}];"
-      },
+        "method": "POST",
+        "url": "={{ $('Config').first().json.EVOLUTION_URL + '/message/sendText/' + $('Config').first().json.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.destino, text: $json.payload.mensagem }) }}",
+        "options": { "allowUnauthorizedCerts": true }
+      }
+    },
+
+    {
       "id": "code-email",
       "name": "Code — preparar email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1500, 440]
+      "position": [1320, 420],
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst p = d.payload || {};\nconst temPdf = !!(p.pdf_base64);\nreturn [{\n  json: {\n    ...d,\n    _assunto:      p.assunto  || 'Nexus: ' + (d.relatorio_nome || d.alerta_nome || 'Notificação'),\n    _html:         '<p>' + (p.resumo || '') + '</p>',\n    _tem_pdf:      temPdf,\n    _pdf_filename: (d.relatorio_nome || d.alerta_nome || 'relatorio') + '.pdf',\n    _pdf_data:     temPdf ? p.pdf_base64 : null\n  },\n  pairedItem: { item: 0 }\n}];"
+      }
     },
 
     {
+      "id": "smtp-send",
+      "name": "SMTP — enviar email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [1540, 420],
+      "continueOnFail": true,
       "parameters": {
         "fromEmail": "={{ $('Config').first().json.SMTP_FROM_NAME + ' <' + $('Config').first().json.SMTP_USER + '>' }}",
         "toEmail": "={{ $json.destino }}",
-        "subject": "={{ $json._payload.assunto || ('Nexus: ' + ($json.alerta_nome || $json.relatorio_nome || 'Notificação')) }}",
-        "html": "={{ $json._payload.html || ('<p>' + ($json._payload.resumo || '') + '</p>') }}",
+        "subject": "={{ $json._assunto }}",
+        "html": "={{ $json._html }}",
         "options": {
           "host": "={{ $('Config').first().json.SMTP_HOST }}",
           "port": "={{ $('Config').first().json.SMTP_PORT }}",
           "user": "={{ $('Config').first().json.SMTP_USER }}",
           "password": "={{ $('Config').first().json.SMTP_PASSWORD }}",
           "ssl": false,
-          "attachments": "={{ $json._tem_pdf ? JSON.stringify([{ fileName: ($json.relatorio_nome || 'relatorio') + '.pdf', data: $json._payload.pdf_base64, mimeType: 'application/pdf' }]) : '[]' }}"
+          "attachments": "={{ $json._tem_pdf ? JSON.stringify([{ fileName: $json._pdf_filename, data: $json._pdf_data, mimeType: 'application/pdf' }]) : '[]' }}"
         }
-      },
-      "id": "smtp-send",
-      "name": "SMTP — enviar email",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 1,
-      "position": [1750, 440],
-      "continueOnFail": true
+      }
     },
 
     {
-      "parameters": {
-        "jsCode": "// Coleta resultado de qualquer canal e determina status\nconst item = $input.first();\n\n// Tenta recuperar o despacho original pela cadeia de pairedItem.\n// Tenta o Code node mais próximo que tem os campos (menor cadeia = menos falha).\n// Email path: Code — preparar email; WP path: Code — tipo WhatsApp.\nlet despachoOriginal = null;\ntry {\n  despachoOriginal = $('Code — tipo WhatsApp').item.json;\n} catch(e1) {\n  try {\n    despachoOriginal = $('Code — preparar email').item.json;\n  } catch(e2) {\n    despachoOriginal = null;\n  }\n}\n\nconst despachoId = despachoOriginal?.id ?? null;\nconst tentativasAnterior = despachoOriginal?.tentativas ?? 0;\n\n// Resposta binary = Evolution enviou mídia com sucesso\nconst temBinary = item.binary && Object.keys(item.binary).length > 0;\n\nconst temErro = !temBinary && (!!item.json?.error || !!item.error);\nconst statusCode = item.json?.statusCode || 200;\nconst erroMsg = temErro\n  ? (item.json?.error?.message || JSON.stringify(item.json?.error || 'erro desconhecido'))\n  : (!temBinary && statusCode >= 400 ? `HTTP ${statusCode}` : null);\n\nconst sucesso = temBinary || (!temErro && statusCode < 400);\n\nreturn [{\n  json: {\n    despacho_id: despachoId,\n    status:      sucesso ? 'enviado' : 'falhou',\n    erro:        erroMsg || null,\n    tentativas:  tentativasAnterior + 1\n  }\n}];"
-      },
       "id": "code-resultado",
       "name": "Code — avaliar resultado",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2250, 300]
+      "position": [1780, 280],
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\nlet despachoId = null;\nlet tentativasAnterior = 0;\ntry {\n  const original = $('Split Out — despachos').item.json;\n  despachoId = original.id;\n  tentativasAnterior = original.tentativas || 0;\n} catch(e) {}\n\n// Evolution usa 'status', n8n usa 'statusCode' — checar ambos\nconst statusCode = item.json?.statusCode ?? item.json?.status ?? 200;\nconst temErro = !!item.json?.error ||\n                (typeof statusCode === 'number' && statusCode >= 400);\nconst sucesso = !temErro;\n\nconst erroMsg = temErro\n  ? String(item.json?.error?.message || item.json?.error || item.json?.message || 'HTTP ' + statusCode)\n  : null;\n\nreturn [{\n  json: {\n    despacho_id: despachoId,\n    status:      sucesso ? 'enviado' : 'falhou',\n    erro:        erroMsg,\n    tentativas:  tentativasAnterior + 1\n  }\n}];"
+      }
     },
 
     {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true },
-          "conditions": [
-            {
-              "id": "cond-id",
-              "leftValue": "={{ $json.despacho_id }}",
-              "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty" }
-            }
-          ]
-        }
-      },
       "id": "if-tem-id",
       "name": "IF — tem despacho_id?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [2500, 300]
+      "position": [2000, 280],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{
+            "id": "c1",
+            "leftValue": "={{ $json.despacho_id }}",
+            "rightValue": 0,
+            "operator": { "type": "number", "operation": "gt" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      }
     },
 
     {
+      "id": "patch-status",
+      "name": "PATCH — despachos status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2220, 200],
       "parameters": {
         "method": "PATCH",
         "url": "={{ $('Config').first().json.NEXUS_URL + '/despachos/' + $json.despacho_id + '/status' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-API-Key",    "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" },
+            { "name": "X-Api-Key",    "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
@@ -311,13 +272,9 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ status: $json.status, erro: $json.erro, tentativas: $json.tentativas }) }}",
         "options": {}
-      },
-      "id": "patch-status",
-      "name": "PATCH — despachos status",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2750, 220]
+      }
     }
+
   ],
 
   "connections": {
@@ -328,41 +285,33 @@
       "main": [[{ "node": "GET — despachos/pendentes", "type": "main", "index": 0 }]]
     },
     "GET — despachos/pendentes": {
-      "main": [[{ "node": "IF — tem_despachos?", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "IF — tem despachos?", "type": "main", "index": 0 }]]
     },
-    "IF — tem_despachos?": {
+    "IF — tem despachos?": {
       "main": [
-        [{ "node": "Split Out — despachos", "type": "main", "index": 0 }]
+        [{ "node": "Split Out — despachos", "type": "main", "index": 0 }],
+        []
       ]
     },
     "Split Out — despachos": {
-      "main": [[{ "node": "Switch — canal", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "IF — canal whatsapp?", "type": "main", "index": 0 }]]
     },
-    "Switch — canal": {
+    "IF — canal whatsapp?": {
       "main": [
-        [{ "node": "Code — tipo WhatsApp", "type": "main", "index": 0 }],
+        [{ "node": "IF — tipo pdf?", "type": "main", "index": 0 }],
         [{ "node": "Code — preparar email", "type": "main", "index": 0 }]
       ]
     },
-    "Code — tipo WhatsApp": {
-      "main": [[{ "node": "Switch — WhatsApp tipo", "type": "main", "index": 0 }]]
-    },
-    "Switch — WhatsApp tipo": {
+    "IF — tipo pdf?": {
       "main": [
-        [{ "node": "Evolution — sendText",      "type": "main", "index": 0 }],
-        [{ "node": "HTTP — buscar PDF Nexus",    "type": "main", "index": 0 }]
+        [{ "node": "Evolution — sendMedia", "type": "main", "index": 0 }],
+        [{ "node": "Evolution — sendText",  "type": "main", "index": 0 }]
       ]
     },
-    "HTTP — buscar PDF Nexus": {
-      "main": [[{ "node": "Code — preparar sendMedia", "type": "main", "index": 0 }]]
-    },
-    "Code — preparar sendMedia": {
-      "main": [[{ "node": "Evolution — sendMedia", "type": "main", "index": 0 }]]
-    },
-    "Evolution — sendText": {
+    "Evolution — sendMedia": {
       "main": [[{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]]
     },
-    "Evolution — sendMedia": {
+    "Evolution — sendText": {
       "main": [[{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]]
     },
     "Code — preparar email": {
@@ -376,7 +325,8 @@
     },
     "IF — tem despacho_id?": {
       "main": [
-        [{ "node": "PATCH — despachos status", "type": "main", "index": 0 }]
+        [{ "node": "PATCH — despachos status", "type": "main", "index": 0 }],
+        []
       ]
     }
   }

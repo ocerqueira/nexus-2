@@ -1,11 +1,30 @@
-# Python-generated files
+# Python
 __pycache__/
 *.py[oc]
 build/
 dist/
 wheels/
 *.egg-info
+.venv/
 
-# Virtual environments
-.venv
-#.env
+# Ambiente — NUNCA commitar arquivos .env com credenciais reais
+# .env.exemplo é o único permitido (template sem valores)
+.env
+.env.local
+.env.dev
+.env.test
+.env.prod
+
+# Logs
+logs/*.log
+
+# Dumps e exports do banco (podem conter dados sensíveis)
+*.sql
+!banco/*.sql
+!docker/*.sql
+!docs/**/*.sql
+
+# IDEs
+.idea/
+.vscode/
+*.swp

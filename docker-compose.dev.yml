@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexus-postgres-dev
+    environment:
+      POSTGRES_USER: nexus_admin
+      POSTGRES_PASSWORD: local123
+      POSTGRES_DB: nexus
+    ports:
+      - "5433:5432"
+    volumes:
+      - nexus_pg_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus_admin -d nexus"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-metas:
+    image: postgres:16-alpine
+    container_name: nexus-postgres-metas-dev
+    environment:
+      POSTGRES_USER: metas_admin
+      POSTGRES_PASSWORD: metas123
+      POSTGRES_DB: nexus_metas
+    ports:
+      - "5434:5432"
+    volumes:
+      - nexus_pg_metas_dev:/var/lib/postgresql/data
+      - ./docker/metas_init.sql:/docker-entrypoint-initdb.d/metas_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metas_admin -d nexus_metas"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nexus:
+    build: .
+    container_name: nexus-api-dev
+    ports:
+      - "8099:8099"
+    env_file:
+      - .env.local
+    environment:
+      DATABASE_URL: postgresql+psycopg://nexus_admin:local123@postgres:5432/nexus
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-metas:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - .:/app
+      - /app/.venv
+    command: ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8099", "--reload"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  nexus_pg_dev:
+  nexus_pg_metas_dev:

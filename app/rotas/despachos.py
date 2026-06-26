@@ -1,9 +1,9 @@
 """
 Rotas de despachos.
 
-GET  /despachos/pendentes  — N8N polling: busca despachos prontos para envio
+GET  /despachos/pendentes    — N8N polling: busca despachos prontos para envio
 PATCH /despachos/{id}/status — N8N callback: atualiza status após envio/falha
-GET  /despachos            — Admin: listagem com filtros
+GET  /despachos              — Admin: listagem com filtros
 """
 
 import logging
@@ -27,13 +27,24 @@ router = APIRouter(prefix="/despachos", tags=["despachos"])
 @router.get("/pendentes")
 def listar_pendentes(
     limite: int = Query(50, ge=1, le=200, description="Máximo de despachos a retornar por chamada"),
-    canal:  str | None = Query(None, description="Filtrar por canal: whatsapp | email | sms"),
+    canal:  str | None = Query(None, description="Filtrar por canal: whatsapp | email"),
+    incluir_retry: bool = Query(False, description="Se True, inclui falhos com menos de 3 tentativas nas últimas 24h"),
 ) -> dict:
     """
-    Retorna despachos pendentes prontos para envio (enviar_apos <= NOW() ou NULL).
-    N8N chama este endpoint em loop para processar a fila de envio.
+    Retorna despachos prontos para envio.
+
+    Retorna: status='pendente' com enviar_apos <= NOW() (ou NULL).
+    Com incluir_retry=true: também retorna status='falhou' com tentativas < 3
+    e criado nas últimas 24h (re-fila automática de falhas transitórias).
     """
     filtro_canal = "AND canal = :canal" if canal else ""
+    filtro_retry = """
+        OR (
+            d.status = 'falhou'
+            AND d.tentativas < 3
+            AND d.criado_em > NOW() - INTERVAL '24 hours'
+        )
+    """ if incluir_retry else ""
 
     with engine.connect() as c:
         rows = c.execute(text(f"""
@@ -42,18 +53,21 @@ def listar_pendentes(
                 d.canal,
                 d.destino,
                 d.payload,
+                d.status         AS status_atual,
+                d.tentativas,
                 d.enviar_apos,
                 d.criado_em,
-                d.tentativas,
                 d.acao_requerida,
                 a.nome  AS alerta_nome,
                 r.nome  AS relatorio_nome
             FROM despachos d
-            LEFT JOIN alertas   a ON a.id = d.alerta_id
+            LEFT JOIN alertas    a ON a.id = d.alerta_id
             LEFT JOIN relatorios r ON r.id = d.relatorio_id
-            WHERE d.status = 'pendente'
-              AND (d.enviar_apos IS NULL OR d.enviar_apos <= NOW())
-              {filtro_canal}
+            WHERE (
+                (d.status = 'pendente' AND (d.enviar_apos IS NULL OR d.enviar_apos <= NOW()))
+                {filtro_retry}
+            )
+            {filtro_canal}
             ORDER BY d.criado_em ASC
             LIMIT :limite
         """), {"limite": limite, "canal": canal}).mappings().all()
@@ -106,6 +120,7 @@ def atualizar_status(
 
     if body.status == "enviado":
         sets.append("enviado_em = :agora")
+        sets.append("ultimo_erro = NULL")
 
     if body.erro is not None:
         sets.append("ultimo_erro = :erro")

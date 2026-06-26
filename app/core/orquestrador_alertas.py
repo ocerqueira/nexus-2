@@ -26,6 +26,7 @@ from sqlalchemy import text
 
 from app.bd import engine
 from app.core.renderizador_mensagens import renderizar_despacho
+from app.core.resolvedor_parametros import resolver_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -412,6 +413,7 @@ def orquestrar_alerta(
         }
 
     # 3. Validar + executar processador
+    parametros = resolver_tokens(parametros)
     processador = processador_classe()
     valido, erro = processador.validar(parametros)
     if not valido:

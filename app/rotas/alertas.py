@@ -2,21 +2,24 @@
 Rotas de verificação de alertas.
 """
 
+import importlib
+import json
 import logging
+from pathlib import Path as FilePath
 
 from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 
-from app.alertas.conexoes_inativas.processador import ProcessadorConexoesInativas
-from app.alertas.item_comprimento_excedente.processador import ProcessadorItemComprimentoExcedente
 from app.core.orquestrador_alertas import AlertaNaoEncontrado, orquestrar_alerta
+from app.core.resolvedor_parametros import resolver_tokens
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/alertas", tags=["alertas"])
 
+_PASTA_ALERTAS = FilePath(__file__).parent.parent / "alertas"
 
-# Schema do body da requisição
+
 class RequisicaoAlerta(BaseModel):
     """Body opcional para verificar alerta."""
 
@@ -25,11 +28,27 @@ class RequisicaoAlerta(BaseModel):
     )
 
 
-# Mapeamento nome → classe do processador
-PROCESSADORES = {
-    "conexoes_inativas": ProcessadorConexoesInativas,
-    "item_comprimento_excedente": ProcessadorItemComprimentoExcedente,
-}
+def _carregar_alerta(nome: str) -> type | None:
+    """
+    Carrega dinamicamente a classe processador de um alerta pelo nome da pasta.
+    Retorna a classe ou None se não encontrado.
+    Novo alerta = nova pasta em app/alertas/ — sem mexer neste arquivo.
+    """
+    config_path = _PASTA_ALERTAS / nome / "config.json"
+    if not config_path.exists():
+        return None
+
+    try:
+        mod = importlib.import_module(f"app.alertas.{nome}.processador")
+    except ImportError:
+        return None
+
+    for attr_name in dir(mod):
+        attr = getattr(mod, attr_name)
+        if isinstance(attr, type) and attr_name.startswith("Processador") and attr_name != "Processador":
+            return attr
+
+    return None
 
 
 @router.post("/{nome_alerta}/verificar")
@@ -45,15 +64,16 @@ def verificar_alerta(
     (consolidadas e individuais) e metadados para o N8N decidir se deve notificar.
     Quando `forcar=true`, ignora cooldown e deduplicação — útil para testes manuais.
     """
-    # 1. Validar que o processador existe
-    if nome_alerta not in PROCESSADORES:
+    # 1. Carregar processador dinamicamente
+    processador_classe = _carregar_alerta(nome_alerta)
+    if not processador_classe:
         raise HTTPException(
             status_code=404,
-            detail=f"Alerta '{nome_alerta}' não tem processador registrado",
+            detail=f"Alerta '{nome_alerta}' não encontrado",
         )
 
-    # Extrair parâmetros (com fallback)
-    parametros = requisicao.parametros if requisicao else {}
+    # Extrair parâmetros e resolver tokens dinâmicos ({{mes_anterior_inicio}}, etc.)
+    parametros = resolver_tokens(requisicao.parametros if requisicao else {})
     logger.info(
         f"Verificando alerta '{nome_alerta}' (forçar={forcar}) params={parametros}"
     )
@@ -63,7 +83,7 @@ def verificar_alerta(
         return orquestrar_alerta(
             nome_alerta=nome_alerta,
             parametros=parametros,
-            processador_classe=PROCESSADORES[nome_alerta],
+            processador_classe=processador_classe,
             forcar=forcar,
         )
     except AlertaNaoEncontrado as erro:

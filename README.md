@@ -28,50 +28,91 @@ API agnóstica para geração de relatórios e alertas consultando múltiplos ba
 | Frontend admin | Tailwind CSS + HTMX + Jinja2 |
 | Gerenciador de pacotes | UV |
 
-## Início rápido
+## Ambientes
+
+| Arquivo | Ambiente | No git? |
+|---|---|---|
+| `.env.exemplo` | Template (sem valores) | ✅ sim |
+| `.env` | Produção | ❌ nunca |
+| `.env.local` | Dev local | ❌ nunca |
+
+Copie o template para o ambiente desejado e preencha os valores:
 
 ```bash
-# 1. Subir banco
-docker compose up -d
-
-# 2. Instalar dependências
-uv sync
-
-# 3. Configurar .env
-cp .env.example .env
-# Edite DATABASE_URL e gere CHAVE_CRIPTOGRAFIA:
-# uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-
-# 4. Executar
-uv run uvicorn main:app --reload --port 8000
+cp .env.exemplo .env        # produção
+cp .env.exemplo .env.local  # dev local
 ```
 
-Acesse:
-- API: http://localhost:8000
-- Swagger: http://localhost:8000/docs
-- Admin: http://localhost:8000/admin
-- Health check: http://localhost:8000/saude
+Gere as chaves necessárias:
+
+```bash
+# API Key
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# Chave de criptografia Fernet (ATENÇÃO: não troque em produção após registrar conexões)
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+## Dev local
+
+Sobe PostgreSQL isolado + API em containers Docker. Não toca no banco de produção.
+
+```bash
+make dev-build    # primeira vez ou após mudar código/dependências
+make dev          # subir sem rebuild
+make dev-logs     # acompanhar logs da API em tempo real
+make dev-down     # parar tudo
+make dev-db       # abrir psql no banco de dev
+```
+
+API disponível em `http://localhost:8099` — Swagger em `http://localhost:8099/docs`.
+
+O banco de dev roda na porta **5433** (prod usa 5432) — impossível confundir por acidente.
+
+## Produção
+
+Rodar no servidor. Usa `.env` com as credenciais reais.
+
+```bash
+make prod-build   # deploy com rebuild da imagem
+make prod         # subir sem rebuild
+make prod-logs    # acompanhar logs
+make prod-down    # parar
+```
+
+Ver containers de ambos os ambientes:
+
+```bash
+make status
+```
 
 ## Estrutura
 
 ```
 nexus-2/
+├── .env.exemplo             # Template de variáveis (commitar — sem valores reais)
+├── .env                     # Produção (não commitar)
+├── .env.local               # Dev local (não commitar)
+├── Makefile                 # Comandos: make dev-build, make prod-logs, etc.
+├── docker-compose.yml       # Produção: só a API, usa .env
+├── docker-compose.dev.yml   # Dev: postgres + postgres-metas + API, usa .env.local
+├── Dockerfile               # Imagem da API
 ├── main.py                  # FastAPI + lifespan + routers
-├── config.py                # Pydantic Settings (.env)
-├── docker-compose.yml       # PostgreSQL
-├── Dockerfile               # Container da API
-├── pyproject.toml           # Dependências
+├── pyproject.toml           # Dependências (UV)
 ├── banco/                   # Migrations SQL idempotentes
 ├── app/
 │   ├── bd.py                # Engine SQLAlchemy
-│   ├── core/                # Criptografia, conexões, sync, orquestrador, renderizadores
-│   ├── rotas/               # Endpoints REST + Admin HTML
-│   ├── relatorios/          # Catálogo de relatórios (pastas com config.json + SQL + processador)
-│   ├── alertas/             # Catálogo de alertas (pastas com config.json + SQL + processador + mensagens)
-│   └── templates/           # Templates Jinja2 do admin
-├── testes/                  # Testes automatizados
-└── docs/                    # Documentação completa (Diátaxis)
+│   ├── core/                # Orquestrador, sincronizador, criptografia, tokens, renderizadores
+│   ├── rotas/               # Endpoints REST
+│   ├── relatorios/          # Catálogo: cada pasta = 1 relatório (config.json + processador.py)
+│   ├── alertas/             # Catálogo: cada pasta = 1 alerta  (config.json + processador.py)
+│   └── templates/           # Templates Jinja2 (PDF + admin)
+└── docs/                    # Documentação (Diátaxis)
 ```
+
+### Adicionar relatório ou alerta
+
+Crie uma pasta em `app/relatorios/<nome>/` com `config.json` e `processador.py`. No próximo restart, o sincronizador registra no banco automaticamente — sem mexer em nenhum outro arquivo.
 
 ## Documentação
 
