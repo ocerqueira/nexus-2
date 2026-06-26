@@ -19,19 +19,19 @@ Ativa o chatbot interativo para que usuários consultem relatórios e alertas pe
 
 No n8n: **Workflows → Import from file** → selecione `docs/n8n/nexus_chatbot.json`.
 
-### Passo 2 — Configurar variáveis de ambiente
+### Passo 2 — Configurar o nó Config
 
-O workflow lê as credenciais via `$env.*`. Configure no n8n em **Settings → Environment Variables**:
+Abra o workflow importado e clique no nó **Config** (Set node logo após o webhook). Preencha os campos:
 
-| Variável | Exemplo | Descrição |
-|----------|---------|-----------|
-| `NEXUS_URL` | `http://192.168.1.100:8099` | URL base do Nexus (sem barra final) |
-| `NEXUS_API_KEY` | `sua_chave_aqui` | Chave em `X-Api-Key` |
-| `EVOLUTION_URL` | `https://api.evolution.com` | URL base da Evolution API (sem barra final) |
-| `EVOLUTION_INSTANCE` | `minha_instancia` | Nome da instância no Evolution |
-| `EVOLUTION_API_KEY` | `sua_chave_evolution` | API key da Evolution API |
+| Campo | Descrição |
+|-------|-----------|
+| `NEXUS_URL` | URL base do Nexus, ex: `http://10.81.234.130:8099` |
+| `NEXUS_API_KEY` | Chave da API Nexus (enviada no header `X-Api-Key`) |
+| `EVOLUTION_URL` | URL base da Evolution API, ex: `https://whats.local.noroeste.corp` |
+| `EVOLUTION_INSTANCE` | Nome da instância no Evolution, ex: `Lucas` |
+| `EVOLUTION_API_KEY` | API key da Evolution API |
 
-> Se preferir não usar variáveis de ambiente, edite os campos diretamente nos nós HTTP Request do workflow.
+Todos os outros nós do workflow referenciam o Config via `$('Config').first().json.*` — edite só este nó.
 
 ### Passo 3 — Obter a URL do webhook
 

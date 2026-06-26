@@ -17,6 +17,26 @@
       "webhookId": "nexus-chatbot"
     },
     {
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [480, 300],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "NEXUS_URL",          "value": "http://10.81.234.130:8099",            "type": "string" },
+            { "id": "a2", "name": "NEXUS_API_KEY",       "value": "sua_chave_nexus",                     "type": "string" },
+            { "id": "a3", "name": "EVOLUTION_URL",       "value": "https://whats.local.noroeste.corp",   "type": "string" },
+            { "id": "a4", "name": "EVOLUTION_INSTANCE",  "value": "Lucas",                               "type": "string" },
+            { "id": "a5", "name": "EVOLUTION_API_KEY",   "value": "433FE547C642-4D64-AA5F-E4D53DD26B2F", "type": "string" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
       "parameters": {
         "jsCode": "const body = $input.first().json;\nconst data = body.data || body;\nconst key = data.key || {};\nconst msg = data.message || {};\nconst fromMe = key.fromMe === true;\nconst numero = (key.remoteJid||'').replace(/@[sg]\\.whatsapp\\.net|@g\\.us/g,'');\nconst listResp = msg.listResponseMessage;\nconst list_id = listResp?.singleSelectReply?.selectedRowId || null;\nconst texto = list_id ? '' : (msg.conversation || msg.extendedTextMessage?.text || '').trim();\nconst msg_type = list_id ? 'list' : 'text';\nif (fromMe || (!texto && !list_id)) return [{skip:true,numero}];\nreturn [{skip:false,numero,msg_type,list_id,texto}];"
       },
@@ -24,7 +44,7 @@
       "name": "Code — parse mensagem",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [480, 300]
+      "position": [700, 300]
     },
     {
       "parameters": {
@@ -41,7 +61,7 @@
       "name": "IF — skip?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [700, 300]
+      "position": [920, 300]
     },
     {
       "parameters": { "jsCode": "return [];" },
@@ -49,15 +69,15 @@
       "name": "Ignorar (fromMe / sem texto)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [920, 160]
+      "position": [1140, 160]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.NEXUS_URL }}/chatbot/sessao/{{ $json.numero }}",
+        "url": "={{ $('Config').first().json.NEXUS_URL }}/chatbot/sessao/{{ $json.numero }}",
         "sendHeaders": true,
         "headerParameters": { "parameters": [
-          { "name": "X-Api-Key", "value": "={{ $env.NEXUS_API_KEY }}" }
+          { "name": "X-Api-Key", "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" }
         ]},
         "options": { "ignore400": true }
       },
@@ -65,7 +85,7 @@
       "name": "GET — sessao",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [920, 380]
+      "position": [1140, 380]
     },
     {
       "parameters": {
@@ -75,15 +95,15 @@
       "name": "Code — state machine",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1140, 380]
+      "position": [1360, 380]
     },
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ $env.NEXUS_URL }}/chatbot/sessao/{{ $json.numero }}",
+        "url": "={{ $('Config').first().json.NEXUS_URL }}/chatbot/sessao/{{ $json.numero }}",
         "sendHeaders": true,
         "headerParameters": { "parameters": [
-          { "name": "X-Api-Key", "value": "={{ $env.NEXUS_API_KEY }}" }
+          { "name": "X-Api-Key", "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" }
         ]},
         "sendBody": true,
         "specifyBody": "json",
@@ -94,7 +114,7 @@
       "name": "PUT — sessao",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1360, 380]
+      "position": [1580, 380]
     },
     {
       "parameters": {
@@ -104,7 +124,7 @@
       "name": "Code — pass to switch",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1580, 380]
+      "position": [1800, 380]
     },
     {
       "parameters": {
@@ -125,7 +145,7 @@
       "name": "Switch — next_action",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 1,
-      "position": [1800, 380]
+      "position": [2020, 380]
     },
     {
       "parameters": {
@@ -135,15 +155,15 @@
       "name": "Code — build menu principal",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2020, 220]
+      "position": [2240, 220]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.EVOLUTION_URL }}/message/sendList/{{ $env.EVOLUTION_INSTANCE }}",
+        "url": "={{ $('Config').first().json.EVOLUTION_URL }}/message/sendList/{{ $('Config').first().json.EVOLUTION_INSTANCE }}",
         "sendHeaders": true,
         "headerParameters": { "parameters": [
-          { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" },
+          { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" },
           { "name": "Content-Type", "value": "application/json" }
         ]},
         "sendBody": true,
@@ -155,7 +175,7 @@
       "name": "Evolution — sendList menu",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2240, 220]
+      "position": [2460, 220]
     },
     {
       "parameters": {
@@ -165,15 +185,15 @@
       "name": "Code — build menu período",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2020, 360]
+      "position": [2240, 360]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.EVOLUTION_URL }}/message/sendList/{{ $env.EVOLUTION_INSTANCE }}",
+        "url": "={{ $('Config').first().json.EVOLUTION_URL }}/message/sendList/{{ $('Config').first().json.EVOLUTION_INSTANCE }}",
         "sendHeaders": true,
         "headerParameters": { "parameters": [
-          { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" },
+          { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" },
           { "name": "Content-Type", "value": "application/json" }
         ]},
         "sendBody": true,
@@ -185,15 +205,15 @@
       "name": "Evolution — sendList período",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2240, 360]
+      "position": [2460, 360]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.EVOLUTION_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE }}",
+        "url": "={{ $('Config').first().json.EVOLUTION_URL }}/message/sendText/{{ $('Config').first().json.EVOLUTION_INSTANCE }}",
         "sendHeaders": true,
         "headerParameters": { "parameters": [
-          { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" },
+          { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" },
           { "name": "Content-Type", "value": "application/json" }
         ]},
         "sendBody": true,
@@ -205,17 +225,17 @@
       "name": "Evolution — sendText",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2020, 500]
+      "position": [2240, 500]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.NEXUS_URL }}/relatorios/{{ $json.recurso_nome }}/solicitar",
+        "url": "={{ $('Config').first().json.NEXUS_URL }}/relatorios/{{ $json.recurso_nome }}/solicitar",
         "sendQuery": true,
         "queryParameters": { "parameters": [{ "name": "formato", "value": "pdf" }] },
         "sendHeaders": true,
         "headerParameters": { "parameters": [
-          { "name": "X-Api-Key", "value": "={{ $env.NEXUS_API_KEY }}" }
+          { "name": "X-Api-Key", "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" }
         ]},
         "sendBody": true,
         "specifyBody": "json",
@@ -226,7 +246,7 @@
       "name": "POST — solicitar relatório PDF",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2020, 640]
+      "position": [2240, 640]
     },
     {
       "parameters": {
@@ -236,15 +256,15 @@
       "name": "Code — preparar PDF",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2240, 640]
+      "position": [2460, 640]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.EVOLUTION_URL }}/message/sendMedia/{{ $env.EVOLUTION_INSTANCE }}",
+        "url": "={{ $('Config').first().json.EVOLUTION_URL }}/message/sendMedia/{{ $('Config').first().json.EVOLUTION_INSTANCE }}",
         "sendHeaders": true,
         "headerParameters": { "parameters": [
-          { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" },
+          { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" },
           { "name": "Content-Type", "value": "application/json" }
         ]},
         "sendBody": true,
@@ -256,15 +276,15 @@
       "name": "Evolution — sendMedia PDF",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2460, 640]
+      "position": [2680, 640]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.NEXUS_URL }}/alertas/{{ $json.recurso_nome }}/verificar",
+        "url": "={{ $('Config').first().json.NEXUS_URL }}/alertas/{{ $json.recurso_nome }}/verificar",
         "sendHeaders": true,
         "headerParameters": { "parameters": [
-          { "name": "X-Api-Key", "value": "={{ $env.NEXUS_API_KEY }}" }
+          { "name": "X-Api-Key", "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" }
         ]},
         "sendBody": true,
         "specifyBody": "json",
@@ -275,7 +295,7 @@
       "name": "POST — verificar alerta",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2020, 780]
+      "position": [2240, 780]
     },
     {
       "parameters": {
@@ -285,15 +305,15 @@
       "name": "Code — preparar resposta alerta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2240, 780]
+      "position": [2460, 780]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.EVOLUTION_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE }}",
+        "url": "={{ $('Config').first().json.EVOLUTION_URL }}/message/sendText/{{ $('Config').first().json.EVOLUTION_INSTANCE }}",
         "sendHeaders": true,
         "headerParameters": { "parameters": [
-          { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" },
+          { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" },
           { "name": "Content-Type", "value": "application/json" }
         ]},
         "sendBody": true,
@@ -305,11 +325,14 @@
       "name": "Evolution — sendText alerta",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2460, 780]
+      "position": [2680, 780]
     }
   ],
   "connections": {
     "Webhook — Evolution messages.upsert": {
+      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+    },
+    "Config": {
       "main": [[{ "node": "Code — parse mensagem", "type": "main", "index": 0 }]]
     },
     "Code — parse mensagem": {
