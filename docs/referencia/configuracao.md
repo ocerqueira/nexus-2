@@ -105,17 +105,16 @@ Cada pasta em `app/relatorios/` e `app/alertas/` deve conter um `config.json` co
 
 ## Docker Compose
 
-O arquivo `docker-compose.yml` define o banco PostgreSQL:
+Dois arquivos de compose — ver `Makefile` para os comandos.
 
-| Configuração | Valor |
-|-------------|-------|
-| Imagem | `postgres:18-alpine` |
-| Container | `nexus-postgres` |
-| Banco | `nexus` |
-| Usuário | `nexus_admin` |
-| Senha | `nexus_dev_2024` |
-| Porta | `55432` (host) → `5432` (container) |
-| Volume | `nexus_postgres_dados` |
+| Arquivo | Uso | Serviços |
+|---------|-----|----------|
+| `docker-compose.yml` | Produção | `nexus-api` (porta 8099) |
+| `docker-compose.dev.yml` | Dev local | `nexus-api-dev` (8099), `nexus-postgres-dev` (5433), `nexus-postgres-metas-dev` (5434) |
+
+Em dev: banco interno na porta **5433** (produção usa 5432 — separação intencional).
+
+API Key dev padrão: `nexus-redecorp-2024` (definida no `.env.local`).
 
 ---
 

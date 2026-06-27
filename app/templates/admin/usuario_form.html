@@ -16,6 +16,25 @@
     {{ campo("cargo", "Cargo", obrigatorio=False, placeholder="Analista") }}
   </div>
 
+  <div class="border-t pt-4">
+    <p class="text-xs font-medium text-slate-500 mb-3">Silêncio (janela em que notificações são bloqueadas)</p>
+    <div class="flex items-center gap-4">
+      <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+        <input type="checkbox" name="silencio_ativo" value="true"
+               class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+        Ativar silêncio
+      </label>
+      <div class="flex items-center gap-2">
+        <label class="text-xs text-slate-500">De</label>
+        <input type="time" name="silencio_inicio"
+               class="px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400">
+        <label class="text-xs text-slate-500">até</label>
+        <input type="time" name="silencio_fim"
+               class="px-2 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400">
+      </div>
+    </div>
+  </div>
+
   <div class="flex justify-end gap-3 pt-2 border-t mt-4">
     <button type="button" onclick="closeModal()"
             class="px-4 py-2 text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">

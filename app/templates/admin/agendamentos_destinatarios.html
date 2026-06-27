@@ -1,5 +1,6 @@
 {% from "admin/_macros.html" import badge, btn_acao %}
 {# Drawer: destinatários extras de um agendamento (além do criador) #}
+<div id="ag-dest-panel-{{ agendamento_id }}">
 
 {% if agendamento %}
 <p class="text-xs text-slate-400 mb-4 pb-3 border-b border-slate-100">
@@ -26,7 +27,7 @@
     <span class="text-xs text-slate-400 ml-2">{{ (d.canais or []) | join(", ") or "sem canal" }}</span>
   </div>
   {{ btn_acao("Remover",
-      'hx-delete="/admin/agendamentos_destinatarios/' ~ agendamento_id ~ '/' ~ d.usuario_id ~ '" hx-target="#ag-dest-list-' ~ agendamento_id ~ '" hx-swap="outerHTML" hx-confirm="Remover?"',
+      'hx-delete="/admin/agendamentos_destinatarios/' ~ agendamento_id ~ '/' ~ d.usuario_id ~ '" hx-target="#ag-dest-panel-' ~ agendamento_id ~ '" hx-swap="outerHTML" hx-confirm="Remover?"',
       "danger") }}
 </div>
 {% endfor %}
@@ -39,7 +40,7 @@
     + Adicionar destinatário extra
   </summary>
   <form hx-post="/admin/agendamentos/{{ agendamento_id }}/destinatarios"
-        hx-target="#ag-dest-list-{{ agendamento_id }}" hx-swap="outerHTML"
+        hx-target="#ag-dest-panel-{{ agendamento_id }}" hx-swap="outerHTML"
         class="px-4 pb-4 space-y-3 pt-3">
 
     <div>
@@ -72,3 +73,4 @@
     </button>
   </form>
 </details>
+</div>

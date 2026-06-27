@@ -45,7 +45,7 @@ GRANT ALL PRIVILEGES ON DATABASE nexus TO nexus_admin;
 Na pasta do projeto no servidor, crie o arquivo `.env` a partir do exemplo:
 
 ```bash
-cp .env-example .env
+cp .env.exemplo .env
 nano .env  # ou vim .env
 ```
 
@@ -158,11 +158,12 @@ curl -X POST http://SEU_SERVIDOR:8000/usuarios \
 
 ## 7. Configurar N8N
 
-Importe os workflows em `docs/n8n/`:
+Importe os três workflows em `docs/n8n/`:
 
-1. N8N → **Settings → Import workflow** → selecione `nexus_dispatcher.json`
-2. Repita para `nexus_chatbot.json`
-3. No workflow importado, edite o nó **"⚙️ Config (Edite aqui)"** com os valores reais:
+1. N8N → **Settings → Import workflow** → selecione `nexus_dispatcher.json` (agendamentos → chama alertas/relatórios)
+2. Repita para `nexus_despachos_sender.json` (polling de `/despachos/pendentes` → envia via Evolution/SMTP)
+3. Repita para `nexus_chatbot.json` (chatbot WhatsApp sob demanda)
+4. Em cada workflow importado, edite o nó **"⚙️ Config (Edite aqui)"** com os valores reais:
 
 | Variável | Valor |
 |---|---|

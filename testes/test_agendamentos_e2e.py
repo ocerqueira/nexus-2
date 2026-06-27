@@ -216,6 +216,10 @@ def main():
     print(f"  Fluxo validado: criar -> listar -> proximas execucoes -> executar -> atualizar -> desativar")
 
 
+def test_e2e_agendamentos():
+    main()
+
+
 if __name__ == "__main__":
     try:
         main()

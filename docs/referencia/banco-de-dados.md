@@ -7,24 +7,29 @@ O Nexus usa PostgreSQL como banco interno. A estrutura é criada automaticamente
 ## Diagrama de tabelas
 
 ```
-usuarios ─────────────────────────────────────────────┐
-│ (auto-referência: gestor_id → usuarios.id)          │
-│                                                     │
-conexoes_bd ──┐                                       │
-│              │                                       │
-grupos_conexoes ── grupos_conexoes_itens (N-N)        │
-│                                                     │
-relatorios ───────────────────────────────────────────┤── permissoes
-│                                                     │
-alertas ── alertas_condicoes ── (destinatarios → usuarios)
-│                                                     │
-agendamentos ── (horarios JSONB, canais JSONB)
-│                                                     │
-chatbot_sessoes ──────────────────────────────────────┤
-│                                                     │
-configuracoes ────────────────────────────────────────┤
-│                                                     │
-historico ────────────────────────────────────────────┘
+usuarios ────────────────────────────────────────────────────────┐
+│ (auto-referência: gestor_id → usuarios.id)                     │
+│                                                                │
+conexoes_bd ──┐                                                  │
+              │                                                  │
+grupos_conexoes ── grupos_conexoes_itens (N-N)                   │
+                                                                 │
+relatorios ── relatorios_destinatarios (N-N) ─────────────────  │
+│                                                                │── permissoes
+alertas ── alertas_destinatarios (N-N)  ─────────────────────── │
+│       ── alertas_itens_notificados                             │
+│                                                                │
+agendamentos ── agendamentos_destinatarios (N-N)                 │
+│                                                                │
+despachos ── (alerta_id | relatorio_id | usuario_id)             │
+│                                                                │
+historico ───────────────────────────────────────────────────────┤
+│                                                                │
+chatbot_sessoes ─────────────────────────────────────────────────┤
+│                                                                │
+configuracoes ───────────────────────────────────────────────────┘
+
+alertas_condicoes ⚠️ DEPRECATED (substituída pela migration 005)
 ```
 
 ---
@@ -50,6 +55,9 @@ Usuários do sistema. Suporta três origens de cadastro: manual, WhatsApp e sinc
 | `ativo` | BOOLEAN | `TRUE` por padrão |
 | `metadados` | JSONB | Campos flexíveis (objectGUID AD, grupos, etc) |
 | `ultimo_sync` | TIMESTAMPTZ | Última sincronização AD (nullable) |
+| `silencio_inicio` | TIME | Início da janela de silêncio (ex: `22:00`) — nullable |
+| `silencio_fim` | TIME | Fim da janela de silêncio (ex: `06:00`) — suporta cruzamento de meia-noite |
+| `silencio_ativo` | BOOLEAN | Se TRUE, despachos criados na janela recebem `enviar_apos` |
 | `criado_em` | TIMESTAMPTZ | Data de criação |
 | `atualizado_em` | TIMESTAMPTZ | Atualizado automaticamente por trigger |
 
@@ -113,6 +121,7 @@ Catálogo de relatórios. Sincronizado automaticamente com `app/relatorios/*` na
 | `descricao` | TEXT | Descrição (nullable) |
 | `categoria` | VARCHAR(50) | Categoria (nullable) |
 | `status` | VARCHAR(20) | `ativo`, `inativo` ou `removido` |
+| `modo_execucao` | VARCHAR(20) | `unico` (padrão) \| `por_destinatario` (1 execução por destinatário com filtros) |
 | `ultimo_sync` | TIMESTAMPTZ | Última sincronização |
 | `removido_em` | TIMESTAMPTZ | Quando foi marcado como removido |
 | `criado_em` | TIMESTAMPTZ | Data de criação |
@@ -132,6 +141,8 @@ Catálogo de alertas. Sincronizado automaticamente com `app/alertas/*`.
 | `descricao` | TEXT | Descrição (nullable) |
 | `severidade` | VARCHAR(20) | `info`, `aviso`, `critico` |
 | `status` | VARCHAR(20) | `ativo`, `inativo` ou `removido` |
+| `cooldown_minutos` | INTEGER | Cooldown global entre disparos (padrão: 60). Operado por item via `alertas_itens_notificados`. |
+| `ultimo_disparo` | TIMESTAMPTZ | Timestamp do último despacho criado (qualquer item) |
 | `ultimo_sync` | TIMESTAMPTZ | Última sincronização |
 | `removido_em` | TIMESTAMPTZ | Quando foi marcado como removido |
 | `criado_em` | TIMESTAMPTZ | Data de criação |
@@ -139,21 +150,97 @@ Catálogo de alertas. Sincronizado automaticamente com `app/alertas/*`.
 
 ---
 
-### `alertas_condicoes`
+### `alertas_condicoes` ⚠️ DEPRECATED
 
-Condições de disparo de cada alerta (quem notificar, por quais canais, com qual cooldown).
+Substituída pela migration 005. `cooldown_minutos` e `ultimo_disparo` foram movidos para `alertas`. Destinatários e canais foram movidos para `alertas_destinatarios`. Ver `banco/005b_migrar_alertas_condicoes.sql`.
+
+---
+
+### `alertas_destinatarios`
+
+Destinatários fixos por alerta — substitui `alertas_condicoes`. Configurado pelo admin.
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
 | `id` | SERIAL PK | Identificador único |
 | `alerta_id` | INTEGER FK → alertas | Alerta associado |
-| `nome` | VARCHAR(100) | Nome descritivo da condição |
-| `destinatarios` | JSONB | Array de `{usuario_id}` ou `{email}` |
-| `canais` | TEXT[] | Array: `{email, whatsapp}` |
-| `cooldown_minutos` | INTEGER | Minutos entre disparos |
-| `ultimo_disparo` | TIMESTAMPTZ | Última vez que disparou |
+| `usuario_id` | INTEGER FK → usuarios | Destinatário (incluindo `origem='externo'`) |
+| `canais` | TEXT[] | `{whatsapp,email}` |
+| `modo_mensagem` | VARCHAR(20) | `individual` (1 msg/item) \| `agrupado` (resumo geral) |
+| `limite_hora` | INTEGER | Max despachos/hora — NULL = sem limite |
+| `limite_dia` | INTEGER | Max despachos/dia — NULL = sem limite |
 | `ativo` | BOOLEAN | `TRUE` por padrão |
 | `criado_em` | TIMESTAMPTZ | Data de criação |
+
+---
+
+### `relatorios_destinatarios`
+
+Destinatários fixos por relatório.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | SERIAL PK | Identificador único |
+| `relatorio_id` | INTEGER FK → relatorios | Relatório associado |
+| `usuario_id` | INTEGER FK → usuarios | Destinatário |
+| `canais` | TEXT[] | Canais habilitados |
+| `formato_whatsapp` | VARCHAR(20) | `documento` (PDF) \| `resumo_texto` (texto) |
+| `filtro_parametros` | JSONB | Override de parâmetros para `modo_execucao='por_destinatario'` |
+| `ativo` | BOOLEAN | `TRUE` por padrão |
+| `criado_em` | TIMESTAMPTZ | Data de criação |
+
+---
+
+### `agendamentos_destinatarios`
+
+Destinatários extras por agendamento específico (além do `agendamentos.usuario_id`).
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | SERIAL PK | Identificador único |
+| `agendamento_id` | INTEGER FK → agendamentos | Agendamento associado |
+| `usuario_id` | INTEGER FK → usuarios | Destinatário extra |
+| `canais` | TEXT[] | Canais para este destinatário |
+| `criado_em` | TIMESTAMPTZ | Data de criação |
+
+---
+
+### `alertas_itens_notificados`
+
+Fingerprint por item para cooldown granular — evita re-notificar o mesmo item dentro do cooldown.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `alerta_id` | INTEGER FK → alertas | PK composta |
+| `item_fingerprint` | VARCHAR(64) | SHA256 dos campos da linha. PK composta. |
+| `primeiro_disparo` | TIMESTAMPTZ | Primeira vez que este item foi notificado |
+| `ultimo_disparo` | TIMESTAMPTZ | Checado contra `alertas.cooldown_minutos` |
+| `total_disparos` | INTEGER | Contador de disparos |
+
+---
+
+### `despachos`
+
+Unidade mínima rastreável de entrega. Criada pelo orquestrador de alertas ou relatórios; consumida pelo `nexus_despachos_sender` no n8n.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | SERIAL PK | Identificador único |
+| `historico_id` | INTEGER FK → historico | Execução que originou o despacho |
+| `alerta_id` | INTEGER FK → alertas | Alerta de origem (nullable) |
+| `relatorio_id` | INTEGER FK → relatorios | Relatório de origem (nullable) |
+| `usuario_id` | INTEGER FK → usuarios | Destinatário (nullable para externos) |
+| `canal` | VARCHAR(20) | `whatsapp` \| `email` \| `sms` |
+| `destino` | VARCHAR(255) | Número ou e-mail de destino |
+| `payload` | JSONB | `{mensagem}` para texto \| `{assunto,html}` para email \| `{documento_base64,...}` para PDF |
+| `status` | VARCHAR(30) | `pendente` → `enviado` → `confirmado` \| `falhou` \| `bloqueado_rate_limit` \| `cancelado` |
+| `tentativas` | INTEGER | Contador de tentativas de envio |
+| `erro` | TEXT | Mensagem de erro da última tentativa |
+| `enviar_apos` | TIMESTAMPTZ | NULL = enviar agora. Preenchido por janela de silêncio. |
+| `acao_requerida` | BOOLEAN | TRUE = destinatário deve confirmar (escalação futura) |
+| `escalado_para` | INTEGER FK → usuarios | Para quem escalar se prazo expirar |
+| `criado_em` | TIMESTAMPTZ | Data de criação |
+| `atualizado_em` | TIMESTAMPTZ | Atualizado por trigger |
 
 ---
 
@@ -186,9 +273,10 @@ Agendamento de execução recorrente. Tabela única com `horarios` e `canais` co
 | `usuario_id` | INTEGER FK → usuarios | Dono do agendamento |
 | `tipo_recurso` | VARCHAR(20) | `relatorio` ou `alerta` |
 | `recurso_id` | INTEGER | ID do recurso |
-| `frequencia` | VARCHAR(20) | `diaria`, `semanal` ou `mensal` |
+| `frequencia` | VARCHAR(20) | `diaria`, `semanal`, `mensal` ou `intervalo` |
 | `dia_semana` | INTEGER | 1-7 se `semanal` |
 | `dia_mes` | INTEGER | 1-31 se `mensal` |
+| `intervalo_minutos` | INTEGER | Intervalo em minutos se `intervalo` |
 | `horarios` | JSONB | Array de `{hora, minuto}` |
 | `apenas_dias_uteis` | BOOLEAN | Pula sábado/domingo |
 | `timezone` | VARCHAR(50) | Timezone IANA dos horários (padrão `America/Sao_Paulo`) |
@@ -277,7 +365,7 @@ Trigger genérica aplicada a todas as tabelas com coluna `atualizado_em`. Atuali
 | `chk_alertas_severidade` | alertas | `info`, `aviso`, `critico` |
 | `chk_historico_tipo_recurso` | historico | `alerta`, `relatorio` |
 | `chk_historico_status` | historico | `sucesso`, `erro`, `sem_dados`, `cooldown` |
-| `chk_ag_frequencia` | agendamentos | `diaria`, `semanal`, `mensal` |
+| `chk_ag_frequencia` | agendamentos | `diaria`, `semanal`, `mensal`, `intervalo` |
 | `chk_ag_dia_semana` | agendamentos | 1-7 |
 | `chk_ag_dia_mes` | agendamentos | 1-31 |
 | `chk_ag_tipo_recurso` | agendamentos | `relatorio`, `alerta` |
@@ -289,5 +377,8 @@ Trigger genérica aplicada a todas as tabelas com coluna `atualizado_em`. Atuali
 | Arquivo | Conteúdo |
 |---------|----------|
 | `banco/001_estrutura_inicial.sql` | Tabelas base: usuarios, conexoes_bd, grupos_conexoes, grupos_conexoes_itens, relatorios, alertas, alertas_condicoes, permissoes, agendamentos, historico |
-| `banco/002_chatbot_sessoes.sql` | Tabela `chatbot_sessoes` para o fluxo de chatbot WhatsApp |
+| `banco/002_chatbot_sessoes.sql` | Tabela `chatbot_sessoes` |
 | `banco/003_timezone_agendamentos.sql` | Coluna `timezone` em `agendamentos` |
+| `banco/004_agendamentos_intervalo.sql` | Frequência `intervalo` com `intervalo_minutos` em `agendamentos` |
+| `banco/005_dispatch_refactor.sql` | Dispatch layer: `despachos`, `alertas_destinatarios`, `relatorios_destinatarios`, `agendamentos_destinatarios`, `alertas_itens_notificados`. Colunas `cooldown_minutos`/`ultimo_disparo` em `alertas`, `modo_execucao` em `relatorios`, `silencio_*` em `usuarios` |
+| `banco/005b_migrar_alertas_condicoes.sql` | Migra dados de `alertas_condicoes` para as novas tabelas e prepara DROP |

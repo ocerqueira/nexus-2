@@ -132,7 +132,7 @@
 
 - **Tipo:** HTTP Request
 - **Método:** POST
-- **URL:** `{{ $json.NEXUS_URL }}/alertas/{{ $json.recurso_nome }}/verificar?forcar=true`
+- **URL:** `{{ $json.NEXUS_URL }}/alertas/{{ $json.recurso_nome }}/verificar`
 - **Body (JSON):**
 ```json
 {
@@ -143,43 +143,21 @@
 
 ```json
 {
-  "alerta": {
-    "id": 1,
-    "nome": "conexoes_inativas",
-    "titulo": "Conexões Inativas",
-    "severidade": "alto"
-  },
+  "alerta": {"id": 1, "nome": "item_comprimento_excedente", "titulo": "...", "severidade": "critico"},
   "deve_notificar": true,
-  "resumo": "3 de 5 conexões inativas",
+  "resumo": "3 itens com comprimento excedente",
   "total_encontrado": 3,
-  "canais": ["whatsapp", "email"],
-  "destinatarios": [
-    {
-      "id": 1,
-      "nome": "Gestor TI",
-      "email": "gestor@empresa.com",
-      "whatsapp": "5511999999999",
-      "canais": ["whatsapp", "email"]
-    }
+  "itens_notificados": 3,
+  "despachos": [
+    {"id": 1, "status": "pendente", "canal": "whatsapp", "destino": "5511999999999", "destinatario": "João", "enviar_apos": null},
+    {"id": 2, "status": "pendente", "canal": "whatsapp", "destino": "5511988888888", "destinatario": "Maria", "enviar_apos": null}
   ],
-  "mensagens_consolidadas": {
-    "whatsapp": "⚠️ *Conexões Inativas*\n\n3 de 5 conexões estão offline...",
-    "email_assunto": "Alerta: Conexões Inativas",
-    "email_html": "<html><body><h1>Conexões Inativas</h1>...</body></html>"
-  },
-  "grupos_individuais": [
-    {
-      "dados_linha": {"conexao": "ERP Unidade 01", "erro": "timeout"},
-      "mensagens": {
-        "whatsapp": "🔴 ERP Unidade 01: timeout",
-        "email_assunto": "Alerta: ERP Unidade 01 offline",
-        "email_html": "<p>ERP Unidade 01 está offline: timeout</p>"
-      }
-    }
-  ],
-  "dados": [...]
+  "despachos_bloqueados_rate_limit": 0,
+  "historico_id": 42
 }
 ```
+
+> **Importante:** O Nexus cria os despachos internamente. O dispatcher **não** precisa fazer loop de destinatários nem chamar a Evolution API — isso é responsabilidade do `nexus_despachos_sender`. O dispatcher apenas chama `/verificar` e depois `/marcar-executado`.
 
 ---
 
@@ -193,58 +171,11 @@
 
 ### 8. Enviar notificações
 
-#### 8a. Loop de destinatários
+> **Arquitetura:** para **alertas**, o Nexus já criou os despachos internamente. O dispatcher apenas confirma a execução via `marcar-executado`. A entrega real (Evolution/SMTP) é feita pelo `nexus_despachos_sender` em paralelo.
+>
+> Para **relatórios**, o dispatcher ainda executa o envio direto (PDF via Evolution ou SMTP).
 
-Iterar sobre `{{ $json.destinatarios }}`.
-
-#### 8b. WhatsApp via Evolution API
-
-- **Tipo:** HTTP Request
-- **Método:** POST
-- **URL:** `{{ $env.EVOLUTION_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE }}`
-- **Headers:**
-  - `apikey: {{ $env.EVOLUTION_API_KEY }}`
-  - `Content-Type: application/json`
-- **Body (JSON):**
-
-```json
-{
-  "number": "{{ $json.destinatario.canais.whatsapp }}",
-  "text": "{{ $json.mensagem_whatsapp }}"
-}
-```
-
-**Qual mensagem usar?**
-- Se houver `grupos_individuais` com WhatsApp individual → envia uma mensagem por linha
-- Senão, envia `mensagens_consolidadas.whatsapp` para cada destinatário
-
-**Exemplo de body para mensagem individual:**
-```json
-{
-  "number": "5511988887777",
-  "text": "🔴 ERP Unidade 01 está offline desde 09:30"
-}
-```
-
-**Exemplo de body para consolidada:**
-```json
-{
-  "number": "5511999999999",
-  "text": "⚠️ *Conexões Inativas*\n\n3 de 5 conexões estão offline:\n- ERP Unidade 01\n- DW Analytics\n- Intranet\n\nVerifique o Nexus para detalhes."
-}
-```
-
-#### 8c. Email via SMTP (alertas)
-
-- **Tipo:** Email (Send)
-- **From:** `{{ $json.SMTP_USER }}`
-- **To:** `{{ $json.email }}`
-- **Subject:** `{{ $json.mensagem_email_assunto }}`
-- **HTML:** `{{ $json.mensagem_email_html }}`
-
-> Se houver mensagens individuais: o nó "Code — montar destinatários" gera uma entrada por item com `mensagem_email_assunto` e `mensagem_email_html` individuais.
-
-#### 8d. WhatsApp com PDF (relatórios)
+#### 8a. WhatsApp com PDF (relatórios)
 
 - **Tipo:** HTTP Request
 - **Método:** POST
@@ -411,254 +342,7 @@ Se for enviar o PDF do relatório como anexo via WhatsApp:
 
 4. **Erro no envio:** se a Evolution API falhar, o N8N pode retentar. O `marcar-executado` só deve ser chamado após confirmação de todos os envios — ou mova-o para um caminho separado com tratamento de erro.
 
-5. **Segurança:** quando o Nexus tiver autenticação (API Key), todos os HTTP Requests devem incluir o header `X-API-Key: {{ $env.NEXUS_API_KEY }}`.
+5. **Segurança:** todos os HTTP Requests devem incluir o header `X-Api-Key: {{ $env.NEXUS_API_KEY }}`.
 
----
 
-# Workflow N8N — Chatbot Sob Demanda
-
-> Usuário manda mensagem no WhatsApp → N8N recebe via Evolution Webhook → gera relatório → responde com PDF.
-> Fluxo separado do Dispatcher. Roda em paralelo, responde em segundos.
-
----
-
-## Visão geral do fluxo
-
-```
-[Usuário envia "relatorio vendas" no WhatsApp]
-       │
-       ▼
-[Evolution Webhook — event: messages.upsert]
-       │
-       ▼
-[IF: é mensagem de texto e começa com "relatorio"]
-   false → [Responde: "Comandos disponíveis: relatorio <nome>"]
-   true  ↓
-       ▼
-[Extrai nome do relatório da mensagem]
-       │
-       ├── "relatorio" (sem nome) → [GET /relatorios] → [Responde lista]
-       │
-       └── "relatorio vendas" (com nome)
-              │
-              ▼
-       [POST /relatorios/{nome}/solicitar?formato=pdf]
-              │
-              ▼
-       [Converte PDF para base64]
-              │
-              ▼
-       [Evolution API: sendMedia — envia PDF]
-              │
-              ▼
-       [Responde: "Pronto! Relatório gerado."]
-```
-
----
-
-## Nós do workflow
-
-### 1. Evolution Webhook
-
-- **Tipo:** Webhook
-- **Path:** `/evolution-webhook`
-- **Método:** POST
-- **Evento:** `messages.upsert`
-
-Payload que chega da Evolution:
-
-```json
-{
-  "event": "messages.upsert",
-  "data": {
-    "key": {
-      "remoteJid": "5511999999999@s.whatsapp.net",
-      "fromMe": false
-    },
-    "message": {
-      "conversation": "relatorio teste_conexoes"
-    },
-    "pushName": "Lucas"
-  }
-}
-```
-
-### 2. IF — É comando de relatório?
-
-- **Condição:** `{{ $json.data.message.conversation.startsWith("relatorio") }}`
-- **False:** ignora (não é comando reconhecido)
-- **True:** continua
-
-### 3. Function — Extrai argumentos
-
-```javascript
-const msg = $json.data.message.conversation;
-const partes = msg.split(" ");
-const comando = partes[0];       // "relatorio"
-const nome = partes.slice(1).join(" "); // "teste_conexoes" ou ""
-
-return {
-  remoteJid: $json.data.key.remoteJid,
-  pushName: $json.data.pushName,
-  comando: comando,
-  nome: nome,
-  temNome: nome.length > 0
-};
-```
-
-### 4. IF — Tem nome de relatório?
-
-- **Condição:** `{{ $json.temNome === true }}`
-- **False:** lista os relatórios disponíveis
-
-#### 4a. Sem nome → Listar relatórios
-
-- **Tipo:** HTTP Request
-- **Método:** GET
-- **URL:** `{{ $env.NEXUS_URL }}/relatorios`
-- **Resposta:**
-```json
-{
-  "total": 1,
-  "relatorios": [
-    {"nome": "teste_conexoes", "titulo": "Teste de Conexões", "subtitulo": "Catálogo"}
-  ]
-}
-```
-
-- **Function para montar resposta:**
-```javascript
-const lista = $json.relatorios.map(r => `• ${r.nome} — ${r.titulo}`).join('\n');
-return {
-  remoteJid: $input.first().json.remoteJid,
-  text: `📊 *Relatórios disponíveis:*\n\n${lista}\n\nEnvie *relatorio <nome>* para gerar.`
-};
-```
-
-- **Envia:** Evolution API `sendText`
-
-#### 4b. Com nome → Gerar relatório
-
-- **Tipo:** HTTP Request
-- **Método:** POST
-- **URL:** `{{ $env.NEXUS_URL }}/relatorios/{{ $json.nome }}/solicitar?formato=pdf`
-- **Body:** `{ "parametros": {} }`
-- **Response:** PDF binário
-
-### 5. IF — Relatório encontrado?
-
-- **Condição:** status code 200
-- **False:**
-```json
-{
-  "remoteJid": "{{ $('Function — Extrai argumentos').item.json.remoteJid }}",
-  "text": "❌ Relatório '{{ $json.nome }}' não encontrado. Envie *relatorio* para ver a lista."
-}
-```
-Envia via Evolution `sendText`.
-
-- **True:** continua
-
-### 6. Function — Converte PDF para base64
-
-```javascript
-const base64 = Buffer.from(await $input.first().binary.data).toString('base64');
-return {
-  remoteJid: $('Function — Extrai argumentos').item.json.remoteJid,
-  base64: `data:application/pdf;base64,${base64}`,
-  fileName: `relatorio_${$('Function — Extrai argumentos').item.json.nome}.pdf`
-};
-```
-
-### 7. Evolution API — Enviar PDF
-
-- **Tipo:** HTTP Request
-- **Método:** POST
-- **URL:** `{{ $env.EVOLUTION_URL }}/message/sendMedia/{{ $env.EVOLUTION_INSTANCE }}`
-- **Headers:**
-  - `apikey: {{ $env.EVOLUTION_API_KEY }}`
-  - `Content-Type: application/json`
-- **Body:**
-```json
-{
-  "number": "{{ $json.remoteJid }}",
-  "mediatype": "document",
-  "fileName": "{{ $json.fileName }}",
-  "caption": "📄 Pronto, {{ $('Function — Extrai argumentos').item.json.pushName }}! Segue o relatório.",
-  "media": "{{ $json.base64 }}"
-}
-```
-
----
-
-## Diagrama visual do Chatbot
-
-```
-[Webhook: Evolution messages.upsert]
-        │
-        ▼
-[IF: começa com "relatorio"]
-   false → ignora
-   true  ↓
-        ▼
-[Function: extrai nome]
-        │
-        ▼
-[IF: temNome]
-   false                          true
-    │                               │
-    ▼                               ▼
-[GET /relatorios]          [POST /relatorios/{nome}/solicitar?formato=pdf]
-    │                               │
-    ▼                               ▼
-[Function: monta lista]     [IF: status 200]
-    │                         false       true
-    ▼                          │            │
-[Evolution sendText]           ▼            ▼
-                         [sendText:    [Function:
-                          "não          base64]
-                          encontrado"]     │
-                                          ▼
-                                   [Evolution sendMedia
-                                    — envia PDF]
-```
-
----
-
-## Comandos suportados pelo Chatbot
-
-| Mensagem | Ação |
-|----------|------|
-| `relatorio` | Lista relatórios disponíveis |
-| `relatorio teste_conexoes` | Gera e envia o PDF do relatório |
-| `relatorio vendas` | Gera e envia o PDF (se existir) |
-
-> Expansão futura: `alerta` para forçar verificação de alerta, `help` para ajuda, etc.
-
----
-
-## Variáveis de ambiente adicionais para o Chatbot
-
-As mesmas do Dispatcher:
-- `NEXUS_URL`
-- `EVOLUTION_URL`
-- `EVOLUTION_INSTANCE`
-- `EVOLUTION_API_KEY`
-
----
-
-## Configuração do Webhook na Evolution API
-
-No painel da Evolution, configure o webhook para apontar para a URL do N8N:
-
-```
-URL: https://n8n.empresa.com/webhook/evolution-webhook
-Eventos: messages.upsert
-```
-
-> Em desenvolvimento local, use ngrok para expor o webhook do N8N:
-> ```
-> ngrok http 5678
-> # URL gerada: https://abc123.ngrok.io
-> # Configurar na Evolution: https://abc123.ngrok.io/webhook/evolution-webhook
-> ```
+> Chatbot WhatsApp: ver [Configurar chatbot WhatsApp](../guias-de-instrucao/configurar-chatbot-whatsapp.md).

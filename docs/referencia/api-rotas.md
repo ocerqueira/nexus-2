@@ -146,23 +146,21 @@ Executa a verificação de um alerta.
 **Resposta (deve notificar)**:
 ```json
 {
-  "alerta": {"id": 1, "nome": "conexoes_inativas", "titulo": "Conexões Inativas Detectadas", "severidade": "aviso"},
+  "alerta": {"id": 1, "nome": "item_comprimento_excedente", "titulo": "Comprimento Excedente", "severidade": "critico"},
   "deve_notificar": true,
-  "resumo": "3 conexões inativas detectadas",
+  "resumo": "3 itens com comprimento excedente",
   "total_encontrado": 3,
-  "canais": ["email", "whatsapp"],
-  "destinatarios": [{"id": 1, "nome": "Admin", "email": "admin@exemplo.com", "whatsapp": null}],
-  "mensagens_consolidadas": {
-    "whatsapp": "⚠️ *Conexões Inativas Detectadas*...",
-    "email_assunto": "[AVISO] Conexões Inativas Detectadas - 3 detectada(s)",
-    "email_html": "<!doctype html>..."
-  },
-  "grupos_individuais": [...],
-  "dados": [...]
+  "itens_notificados": 3,
+  "despachos": [
+    {"id": 1, "status": "pendente", "canal": "whatsapp", "destino": "5511999999999", "destinatario": "João Vendedor", "enviar_apos": null},
+    {"id": 2, "status": "pendente", "canal": "whatsapp", "destino": "5511988888888", "destinatario": "Maria Assistente", "enviar_apos": null}
+  ],
+  "despachos_bloqueados_rate_limit": 0,
+  "historico_id": 42
 }
 ```
 
-Opcionalmente, o campo `fingerprint` aparece quando o processador fornece hash SHA256 para deduplicação.
+Os despachos são inseridos na tabela `despachos` com `status=pendente`. O workflow `nexus_despachos_sender` no n8n faz polling em `/despachos/pendentes` e executa a entrega.
 
 **Resposta (em cooldown)**:
 ```json
@@ -184,19 +182,19 @@ Opcionalmente, o campo `fingerprint` aparece quando o processador fornece hash S
 }
 ```
 
-**Campos do payload de notificação**:
+**Campos da resposta**:
 
 | Campo | Descrição |
 |-------|-----------|
 | `alerta` | Dados básicos do alerta (id, nome, título, severidade) |
-| `deve_notificar` | `true` se o alerta deve disparar |
-| `motivo` | Se `deve_notificar=false`, explica o motivo (`em_cooldown`, `sem_dados`, `parametros_invalidos`) |
+| `deve_notificar` | `true` se despachos pendentes foram criados |
+| `motivo` | Se `deve_notificar=false`, explica o motivo |
 | `resumo` | Texto curto descritivo do resultado |
-| `canais` | Array de canais consolidados das condições (`["email", "whatsapp"]`) |
-| `destinatarios` | Lista de destinatários resolvidos com nome, email, whatsapp |
-| `mensagens_consolidadas` | Mensagens renderizadas por canal (`whatsapp`, `email_assunto`, `email_html`) |
-| `grupos_individuais` | Mensagens por linha de resultado (uma entrada por linha) |
-| `dados` | Dados brutos retornados pelo processador |
+| `total_encontrado` | Total de itens retornados pelo processador |
+| `itens_notificados` | Itens que passaram pelo filtro de cooldown/dedup |
+| `despachos` | Array de despachos pendentes criados (id, canal, destino, destinatario, enviar_apos) |
+| `despachos_bloqueados_rate_limit` | Despachos bloqueados por rate limit (auditável) |
+| `historico_id` | ID do registro de auditoria em `historico` |
 
 **Erros**:
 
@@ -210,9 +208,69 @@ Opcionalmente, o campo `fingerprint` aparece quando o processador fornece hash S
 | `motivo` | Causa |
 |---|---|
 | `sem_dados` | Query retornou zero linhas |
-| `em_cooldown` | Ainda dentro do período de cooldown da condição |
-| `dados_sem_alteracao` | Fingerprint igual ao último disparo (dedup ativo) |
+| `em_cooldown` | Alerta em cooldown global |
+| `todos_itens_em_cooldown` | Itens encontrados, mas todos já foram notificados dentro do cooldown |
 | `parametros_invalidos` | Parâmetros rejeitados pelo `validar()` do processador |
+
+---
+
+---
+
+## Despachos
+
+Unidades rastreáveis de entrega. Criados internamente pelo Nexus ao verificar alertas ou solicitar relatórios com `notificar=true`. O workflow `nexus_despachos_sender` no n8n faz polling e executa o envio.
+
+### `GET /despachos/pendentes`
+
+Retorna despachos com `status=pendente` e `enviar_apos IS NULL OR enviar_apos <= NOW()`. Endpoint principal do n8n sender.
+
+**Query parameters**:
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `canal` | string | Filtrar por canal (`whatsapp`, `email`) |
+| `limite` | integer | Máximo de registros retornados (padrão: 50) |
+
+**Resposta**:
+```json
+{
+  "total": 2,
+  "despachos": [
+    {
+      "id": 1,
+      "canal": "whatsapp",
+      "destino": "5511999999999",
+      "payload": {"mensagem": "⚠️ Item X com comprimento excedente"},
+      "alerta_id": 1,
+      "relatorio_nome": null,
+      "tentativas": 0
+    }
+  ]
+}
+```
+
+### `GET /despachos`
+
+Lista histórico de despachos com filtros.
+
+**Query parameters**: `status`, `canal`, `alerta_id`, `relatorio_nome`, `limite`, `offset`.
+
+### `PATCH /despachos/{id}/status`
+
+Callback do n8n após tentativa de envio.
+
+**Body**:
+```json
+{
+  "status": "enviado",
+  "tentativas": 1,
+  "erro": null
+}
+```
+
+Status válidos: `enviado` | `falhou` | `confirmado` | `cancelado`.
+
+Despachos com `status=falhou` e `tentativas < 3` voltam automaticamente para `pendente` no próximo polling.
 
 ---
 

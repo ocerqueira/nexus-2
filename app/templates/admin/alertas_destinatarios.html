@@ -1,5 +1,6 @@
 {% from "admin/_macros.html" import badge, btn_acao %}
 {# Drawer: destinatários de um alerta #}
+<div id="alerta-dest-panel-{{ alerta_id }}">
 
 {# ── Cooldown global do alerta ─────────────────────────── #}
 <div class="mb-4 pb-4 border-b border-slate-100">
@@ -41,15 +42,15 @@
     <div class="flex items-center gap-1.5">
       {% if d.ativo %}
       {{ btn_acao("Desativar",
-          'hx-post="/admin/alertas_destinatarios/' ~ d.id ~ '/toggle" hx-target="#dest-list-' ~ alerta_id ~ '" hx-swap="outerHTML"',
+          'hx-post="/admin/alertas_destinatarios/' ~ d.id ~ '/toggle" hx-target="#alerta-dest-panel-' ~ alerta_id ~ '" hx-swap="outerHTML"',
           "danger") }}
       {% else %}
       {{ btn_acao("Ativar",
-          'hx-post="/admin/alertas_destinatarios/' ~ d.id ~ '/toggle" hx-target="#dest-list-' ~ alerta_id ~ '" hx-swap="outerHTML"',
+          'hx-post="/admin/alertas_destinatarios/' ~ d.id ~ '/toggle" hx-target="#alerta-dest-panel-' ~ alerta_id ~ '" hx-swap="outerHTML"',
           "success") }}
       {% endif %}
       {{ btn_acao("Remover",
-          'hx-delete="/admin/alertas_destinatarios/' ~ d.id ~ '" hx-target="#dest-list-' ~ alerta_id ~ '" hx-swap="outerHTML" hx-confirm="Remover destinatário?"',
+          'hx-delete="/admin/alertas_destinatarios/' ~ d.id ~ '" hx-target="#alerta-dest-panel-' ~ alerta_id ~ '" hx-swap="outerHTML" hx-confirm="Remover destinatário?"',
           "danger") }}
     </div>
   </div>
@@ -69,7 +70,7 @@
     + Adicionar destinatário
   </summary>
   <form hx-post="/admin/alertas/{{ alerta_id }}/destinatarios"
-        hx-target="#dest-list-{{ alerta_id }}" hx-swap="outerHTML"
+        hx-target="#alerta-dest-panel-{{ alerta_id }}" hx-swap="outerHTML"
         class="px-4 pb-4 space-y-3 pt-3">
 
     <div>
@@ -129,3 +130,4 @@
     </button>
   </form>
 </details>
+</div>

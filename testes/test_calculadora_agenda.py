@@ -13,6 +13,7 @@ from app.core.calculadora_agenda import (
     _proximo_mes,
     calcular_proximo_envio,
     calcular_proximo_envio_diaria,
+    calcular_proximo_envio_intervalo,
     calcular_proximo_envio_mensal,
     calcular_proximo_envio_semanal,
 )
@@ -240,3 +241,64 @@ def test_dispatcher_chama_funcao_correta():
         datetime(2026, 6, 22, 9, 0),
     )
     assert r == datetime(2026, 6, 22, 10, 0)
+
+
+# =============================================================================
+# Intervalo
+# =============================================================================
+
+def test_intervalo_adiciona_minutos():
+    ag = {"intervalo_minutos": 30}
+    resultado = calcular_proximo_envio_intervalo(ag, datetime(2026, 6, 22, 9, 0))
+    assert resultado == datetime(2026, 6, 22, 9, 30)
+
+
+def test_intervalo_vira_dia():
+    ag = {"intervalo_minutos": 120}
+    resultado = calcular_proximo_envio_intervalo(ag, datetime(2026, 6, 22, 23, 0))
+    assert resultado == datetime(2026, 6, 23, 1, 0)
+
+
+def test_intervalo_via_dispatcher():
+    ag = {"frequencia": "intervalo", "intervalo_minutos": 45}
+    resultado = calcular_proximo_envio(ag, datetime(2026, 6, 22, 9, 0))
+    assert resultado == datetime(2026, 6, 22, 9, 45)
+
+
+# =============================================================================
+# UTC naive — garantia de contrato
+# =============================================================================
+
+def test_resultados_sao_sempre_utc_naive():
+    """Todos os retornos devem ser datetime naive (sem tzinfo)."""
+    a_partir_de = datetime(2026, 6, 22, 9, 0)
+    base = {"horarios": [{"hora": 10, "minuto": 0}]}
+
+    assert calcular_proximo_envio(_ag("diaria", base["horarios"]), a_partir_de).tzinfo is None
+    assert calcular_proximo_envio(_ag("semanal", base["horarios"], dia_semana=1), a_partir_de).tzinfo is None
+    assert calcular_proximo_envio(_ag("mensal", base["horarios"], dia_mes=25), a_partir_de).tzinfo is None
+    assert calcular_proximo_envio({"frequencia": "intervalo", "intervalo_minutos": 30}, a_partir_de).tzinfo is None
+
+
+# =============================================================================
+# Timezone
+# =============================================================================
+
+def test_timezone_sao_paulo_converte_para_utc():
+    # SP = UTC-3 em junho (sem horário de verão desde 2019)
+    # a_partir_de = 09:00 UTC → 06:00 SP local
+    # horario alvo = 07:00 SP → 10:00 UTC
+    ag = {"frequencia": "diaria", "horarios": [{"hora": 7, "minuto": 0}], "timezone": "America/Sao_Paulo"}
+    resultado = calcular_proximo_envio(ag, datetime(2026, 6, 22, 9, 0))
+    assert resultado == datetime(2026, 6, 22, 10, 0)
+
+
+def test_timezone_no_agendamento_tem_prioridade_sobre_parametro():
+    ag = {
+        "frequencia": "diaria",
+        "horarios": [{"hora": 7, "minuto": 0}],
+        "timezone": "America/Sao_Paulo",
+    }
+    # timezone_str="UTC" deve ser ignorado quando agendamento.timezone está presente
+    resultado = calcular_proximo_envio(ag, datetime(2026, 6, 22, 9, 0), timezone_str="UTC")
+    assert resultado == datetime(2026, 6, 22, 10, 0)

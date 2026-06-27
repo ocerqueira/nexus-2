@@ -6,31 +6,22 @@ Cobre: conexão BD → usuário → permissão → relatório/alerta → agendam
 
 ## 1. Subir a API
 
-### Opção A — Docker (só API, Postgres externo)
+### Dev local (recomendado)
 
 ```bash
-docker build -t nexus-api .
-docker run -d \
-  --name nexus-api \
-  -p 8000:8000 \
-  -e DATABASE_URL="postgresql+psycopg://usuario:senha@host:5432/nexus" \
-  -e CHAVE_CRIPTOGRAFIA="VhruMtBADWONpWNyyOaik4RnYmwvkTdYtQ-4WFCWsP0=" \
-  nexus-api
+make dev-build   # primeira vez
+make dev         # subir sem rebuild
 ```
 
-### Opção B — Docker Compose (API + Postgres embutido)
+API em `http://localhost:8099` | Docs em `http://localhost:8099/docs`
+
+### Produção
 
 ```bash
-docker compose up -d --build
+make prod-build
 ```
 
-### Opção C — Local
-
-```bash
-uv run uvicorn main:app --reload
-```
-
-API em `http://localhost:8000` | Docs em `http://localhost:8000/docs`
+Ver [guia de deploy](../deploy.md) para configuração completa.
 
 ---
 
@@ -38,6 +29,7 @@ API em `http://localhost:8000` | Docs em `http://localhost:8000/docs`
 
 ```http
 POST /conexoes
+X-Api-Key: nexus-redecorp-2024
 Content-Type: application/json
 
 {
@@ -162,7 +154,7 @@ Alertas disponíveis (ver `/alertas`):
 - `conexoes_inativas`
 - `item_comprimento_excedente`
 
-Resposta inclui `disparo: true/false` e payload para envio.
+Resposta inclui `deve_notificar: true/false` e lista de despachos criados.
 
 ---
 
@@ -184,7 +176,7 @@ Content-Type: application/json
 }
 ```
 
-Frequências: `diaria` | `semanal` (requer `dia_semana` 1-7) | `mensal` (requer `dia_mes` 1-31)
+Frequências: `diaria` | `semanal` (requer `dia_semana` 1-7) | `mensal` (requer `dia_mes` 1-31) | `intervalo` (requer `intervalo_minutos`)
 
 ---
 
@@ -230,7 +222,8 @@ GET /usuarios/whatsapp/5511999990001
 
 | Variável | Padrão | Descrição |
 |----------|--------|-----------|
-| `DATABASE_URL` | `postgresql+psycopg://nexus_admin:nexus_dev_2024@localhost:55432/nexus` | Postgres do Nexus |
-| `CHAVE_CRIPTOGRAFIA` | chave dev | Fernet — trocar em produção |
+| `DATABASE_URL` | `postgresql+psycopg://nexus_admin:nexus_dev_2024@localhost:55432/nexus` | Postgres do Nexus (dev: porta 5433 no host, configurado no `.env.local`) |
+| `CHAVE_CRIPTOGRAFIA` | chave dev | Fernet — trocar em produção, **não trocar após cadastrar conexões** |
 | `AMBIENTE` | `desenvolvimento` | `producao` desativa debug |
 | `DEBUG` | `true` | Loga SQL quando true |
+| `API_KEY` | `nexus-redecorp-2024` (dev) | Chave de autenticação enviada no header `X-Api-Key` |
