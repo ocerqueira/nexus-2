@@ -17,6 +17,7 @@ import pandas as pd
 
 from app.core.carregador_sql import carregar_query
 from app.core.gerenciador_conexoes import gerenciador_conexoes
+from app.relatorios._cores import COR_AZUL
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +26,6 @@ CONEXAO_ERP = "REPLICA_TERRA"
 
 matplotlib.use("Agg")
 plt.style.use("seaborn-v0_8-whitegrid")
-
-COR_AZUL = "#2563eb"
-COR_CINZA = "#e5e7eb"
-
 
 def _grafico_para_base64(fig: plt.Figure) -> str:
     buf = io.BytesIO()

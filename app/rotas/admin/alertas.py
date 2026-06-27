@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 
 from ._base import (
     engine, logger, templates, text,
-    _badge, _fmt_dt, orquestrar_alerta,
+    _badge, _formatar_datetime, orquestrar_alerta,
     _carregar_processador_alerta,
 )
 
@@ -37,7 +37,7 @@ def _alertas_db(status_filtro: str = "") -> tuple[list[dict], int]:
     grupos: dict = {s: [] for s in _ordem}
     for r in rows:
         d = dict(r)
-        d["ultimo_sync_fmt"] = _fmt_dt(d["ultimo_sync"])
+        d["ultimo_sync_fmt"] = _formatar_datetime(d["ultimo_sync"])
         grupos.setdefault(d["severidade"], []).append(d)
 
     grupos_list = [{"severidade": s, "alertas": grupos[s]} for s in _ordem if grupos.get(s)]

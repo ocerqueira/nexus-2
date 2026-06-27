@@ -22,6 +22,7 @@ import pandas as pd
 
 from app.core.carregador_sql import carregar_query
 from app.core.gerenciador_conexoes import gerenciador_conexoes
+from app.relatorios._cores import COR_AMARELO, COR_AZUL, COR_CINZA, COR_VERDE, COR_VERMELHO
 
 # ---------------------------------------------------------------------------
 # Configuração
@@ -33,13 +34,6 @@ CONEXAO_METAS = "nexus_metas"
 
 matplotlib.use("Agg")
 plt.style.use("seaborn-v0_8-whitegrid")
-
-COR_AZUL = "#2563eb"
-COR_VERDE = "#10b981"
-COR_VERMELHO = "#ef4444"
-COR_AMARELO = "#f59e0b"
-COR_CINZA = "#6b7280"
-
 
 def _grafico_para_base64(figura: plt.Figure) -> str:
     buf = io.BytesIO()

@@ -3,7 +3,7 @@ import json
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 
-from ._base import engine, templates, text, _fmt_dt, _DESP_POR_PAG, _HIST_POR_PAGINA
+from ._base import engine, templates, text, _formatar_datetime, _DESPACHOS_POR_PAGINA, _HIST_POR_PAGINA
 
 router = APIRouter()
 
@@ -11,7 +11,7 @@ router = APIRouter()
 def _despachos_db(status: str = "", canal: str = "", busca: str = "",
                   pagina: int = 1) -> tuple[list[dict], int]:
     filtros = ["1=1"]
-    params: dict = {"lim": _DESP_POR_PAG, "off": (pagina - 1) * _DESP_POR_PAG}
+    params: dict = {"lim": _DESPACHOS_POR_PAGINA, "off": (pagina - 1) * _DESPACHOS_POR_PAGINA}
     if status:
         filtros.append("d.status = :status")
         params["status"] = status
@@ -46,8 +46,8 @@ def _despachos_db(status: str = "", canal: str = "", busca: str = "",
     result = []
     for r in rows:
         d = dict(r)
-        d["criado_em_fmt"] = _fmt_dt(d["criado_em"])
-        d["enviar_apos_fmt"] = _fmt_dt(d.get("enviar_apos"))
+        d["criado_em_fmt"] = _formatar_datetime(d["criado_em"])
+        d["enviar_apos_fmt"] = _formatar_datetime(d.get("enviar_apos"))
         d["recurso_nome"] = d.get("alerta_nome") or d.get("relatorio_nome") or "—"
         d["recurso_tipo"] = "alerta" if d.get("alerta_nome") else ("relatorio" if d.get("relatorio_nome") else "—")
         err = str(d.get("ultimo_erro") or "")
@@ -88,7 +88,7 @@ def _historico_db(tipo: str = "", status: str = "", busca: str = "",
     result = []
     for r in rows:
         d = dict(r)
-        d["criado_em_fmt"] = _fmt_dt(d["criado_em"])
+        d["criado_em_fmt"] = _formatar_datetime(d["criado_em"])
         d["criado_em_date"] = d["criado_em"].strftime("%d/%m/%Y") if d.get("criado_em") else "—"
         err = str(d.get("mensagem_erro") or "")
         d["erro_resumo"] = (err[:80] + "…") if err else ""
@@ -107,7 +107,8 @@ def admin_despachos_view(request: Request,
         "registros": registros, "total": total,
         "status": status, "canal": canal, "busca": busca,
         "pagina": pagina,
-        "total_paginas": max(1, -(-total // _DESP_POR_PAG)),
+        # -(-total // limit) = divisão inteira com arredondamento para cima (teto)
+        "total_paginas": max(1, -(-total // _DESPACHOS_POR_PAGINA)),
     })
 
 
@@ -138,7 +139,7 @@ def admin_historico_detalhe(request: Request, registro_id: int):
     if not row:
         return HTMLResponse("")
     h = dict(row)
-    h["criado_em_fmt"] = _fmt_dt(h.get("criado_em"))
+    h["criado_em_fmt"] = _formatar_datetime(h.get("criado_em"))
     try:
         h["parametros_fmt"] = json.dumps(h["parametros"], ensure_ascii=False, indent=2) if h.get("parametros") else ""
     except Exception:

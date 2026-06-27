@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 
-from ._base import engine, templates, text, _fmt_dt, _recursos_lista
+from ._base import engine, templates, text, _formatar_datetime, _recursos_lista
 
 router = APIRouter()
 
@@ -31,7 +31,7 @@ def admin_dashboard(request: Request):
     hist = []
     for h in rows:
         d = dict(h)
-        d["criado_em_fmt"] = _fmt_dt(d["criado_em"])
+        d["criado_em_fmt"] = _formatar_datetime(d["criado_em"])
         err = str(d.get("mensagem_erro") or "")
         d["erro_resumo"] = (err[:70] + "…") if err else ""
         hist.append(d)

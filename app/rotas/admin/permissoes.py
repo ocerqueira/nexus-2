@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse
 
-from ._base import engine, templates, text, _fmt_date, _PERM_USUARIOS_POR_PAGINA, _usuarios_lista, _recursos_lista
+from ._base import engine, templates, text, _formatar_data, _PERM_USUARIOS_POR_PAGINA, _usuarios_lista, _recursos_lista
 
 router = APIRouter()
 
@@ -35,7 +35,7 @@ def _permissoes_db(busca: str = "", tipo_filtro: str = "", pagina: int = 1) -> t
     grupos: dict = {}
     for r in rows:
         d = dict(r)
-        d["criado_em_fmt"] = _fmt_date(d["criado_em"])
+        d["criado_em_fmt"] = _formatar_data(d["criado_em"])
         uid = d["usuario_id"]
         if uid not in grupos:
             grupos[uid] = {"usuario_id": uid, "usuario_nome": d["usuario_nome"], "permissoes": []}

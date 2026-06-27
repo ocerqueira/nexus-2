@@ -61,6 +61,7 @@ def calcular_proximo_envio_diaria(
     a_partir_de: datetime | None = None,
     timezone_str: str = "UTC",
 ) -> datetime:
+    """Próximo horário diário em hora local, convertido para UTC naive."""
     tz = ZoneInfo(timezone_str)
     agora_utc = _agora_utc(a_partir_de)
     agora_local = agora_utc.astimezone(tz).replace(tzinfo=None)
@@ -93,6 +94,10 @@ def calcular_proximo_envio_semanal(
     a_partir_de: datetime | None = None,
     timezone_str: str = "UTC",
 ) -> datetime:
+    """
+    Próximo envio no dia da semana configurado (dia_semana: 1=seg, 7=dom).
+    Se hoje é o dia alvo mas já passou o horário, avança 7 dias.
+    """
     tz = ZoneInfo(timezone_str)
     agora_utc = _agora_utc(a_partir_de)
     agora_local = agora_utc.astimezone(tz).replace(tzinfo=None)
@@ -128,6 +133,10 @@ def calcular_proximo_envio_mensal(
     a_partir_de: datetime | None = None,
     timezone_str: str = "UTC",
 ) -> datetime:
+    """
+    Próximo envio no dia do mês configurado (dia_mes: 1-31).
+    Se o dia não existe no mês (ex: dia 31 em fevereiro), avança para o próximo mês.
+    """
     tz = ZoneInfo(timezone_str)
     agora_utc = _agora_utc(a_partir_de)
     agora_local = agora_utc.astimezone(tz).replace(tzinfo=None)
@@ -162,6 +171,11 @@ def calcular_proximo_envio_mensal(
 
 
 def _proximo_mes(data_atual: date, dia_alvo: int) -> date:
+    """
+    Retorna a data no próximo mês com o dia desejado.
+    Faz fallback para 30, 29 ou 28 se o dia não existe no mês destino
+    (ex: dia_alvo=31 em abril → retorna 30/04).
+    """
     ano = data_atual.year
     mes = data_atual.month + 1
     if mes > 12:

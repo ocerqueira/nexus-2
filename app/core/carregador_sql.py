@@ -1,3 +1,14 @@
+"""
+Carregador de queries SQL nomeadas.
+
+Convenção de marcadores no arquivo .sql:
+  -- name: nome_da_query
+  SELECT ...
+
+Múltiplas queries no mesmo arquivo, separadas por -- name:.
+Queries são cacheadas em memória na primeira leitura.
+"""
+
 import logging
 from pathlib import Path
 
@@ -7,6 +18,11 @@ _cache_queries: dict[str, dict[str, str]] = {}
 
 
 def _parsear_arquivo_sql(caminho: Path) -> dict[str, str]:
+    """
+    Lê um arquivo .sql e separa as queries pelo marcador '-- name:'.
+    Comentários (linhas iniciando com '--') são removidos para evitar
+    problemas de encoding com caracteres especiais em acentuação.
+    """
     if not caminho.exists():
         raise FileNotFoundError(f"Arquivo SQL não encontrado: {caminho}")
 
@@ -45,7 +61,7 @@ def _parsear_arquivo_sql(caminho: Path) -> dict[str, str]:
 
 
 def carregar_queries(caminho_arquivo: Path) -> dict[str, str]:
-
+    """Retorna todas as queries do arquivo como dict {nome: sql}. Usa cache por caminho."""
     caminho_str = str(caminho_arquivo)
     if caminho_str not in _cache_queries:
         logger.info(f"Carregando queries de {caminho_arquivo.name}")

@@ -24,6 +24,7 @@ import pandas as pd
 
 from app.core.carregador_sql import carregar_query
 from app.core.gerenciador_conexoes import gerenciador_conexoes
+from app.relatorios._cores import COR_AMARELO, COR_AZUL, COR_CINZA, COR_ROXO, COR_VERDE, COR_VERMELHO
 
 logger = logging.getLogger(__name__)
 
@@ -33,13 +34,6 @@ CONEXAO_METAS = "nexus_metas"
 
 matplotlib.use("Agg")
 plt.style.use("seaborn-v0_8-whitegrid")
-
-COR_AZUL     = "#2563eb"
-COR_VERDE    = "#10b981"
-COR_VERMELHO = "#ef4444"
-COR_AMARELO  = "#f59e0b"
-COR_CINZA    = "#6b7280"
-COR_ROXO     = "#7c3aed"
 
 
 # =============================================================================
@@ -325,7 +319,7 @@ class ProcessadorModeloRelatorio:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-        if "serie_temporal" == "serie_temporal" and not df_serie.empty:
+        if not df_serie.empty:
             for col in ["valor", "qtd_pedidos"]:
                 if col in df_serie.columns:
                     df_serie[col] = pd.to_numeric(df_serie[col], errors="coerce").fillna(0)

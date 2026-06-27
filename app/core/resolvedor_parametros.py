@@ -58,6 +58,8 @@ def resolver_tokens(parametros: dict) -> dict:
         return parametros
     mapa = _mapa_tokens()
     return {
+        # m.group(1) = nome do token (ex: "hoje"); m.group(0) = token completo (ex: "{{hoje}}")
+        # se o token não existe no mapa, mantém o original sem alteração
         k: _TOKEN.sub(lambda m: mapa.get(m.group(1), m.group(0)), v) if isinstance(v, str) else v
         for k, v in parametros.items()
     }

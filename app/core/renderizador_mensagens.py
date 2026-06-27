@@ -2,9 +2,12 @@
 Renderizador de mensagens de alertas.
 Renderiza templates Jinja2 por canal e modo.
 
+Conceito atual: alertas WhatsApp são sempre enviados em modo 'individual'
+(1 despacho por item detectado). O modo 'agrupado' existe no código mas
+não é o fluxo ativo — cada ocorrência gera sua própria mensagem.
+
 Convenção de arquivos em alertas/{nome}/mensagens/:
-  whatsapp_individual.txt         → WhatsApp, 1 despacho por item
-  whatsapp_consolidado.txt        → WhatsApp, todos os itens agrupados
+  whatsapp_individual.txt         → WhatsApp, 1 despacho por item  ← fluxo ativo
   email_individual_assunto.txt    → Email individual: linha de assunto
   email_individual_html.html      → Email individual: corpo HTML
   email_consolidado_assunto.txt   → Email agrupado: linha de assunto
@@ -33,6 +36,7 @@ _TEMPLATES: dict[tuple[str, str], list[tuple[str, bool, str]]] = {
         ("whatsapp_individual.txt", False, "mensagem"),
     ],
     ("whatsapp", "agrupado"): [
+        # Não é o fluxo ativo — WhatsApp usa sempre modo 'individual'
         ("whatsapp_consolidado.txt", False, "mensagem"),
     ],
     ("email", "individual"): [
@@ -175,7 +179,7 @@ def renderizar_mensagens_consolidadas(
     nome_alerta: str,
     contexto: dict,
 ) -> dict[str, str]:
-    """Legado. Use renderizar_despacho(canal='whatsapp'|'email', modo='agrupado')."""
+    """Legado — modo consolidado não é mais utilizado para WhatsApp. Use renderizar_despacho(modo='individual')."""
     resultado = {}
     for canal in ("whatsapp", "email"):
         payload = renderizar_despacho(nome_alerta, canal, "agrupado", contexto)

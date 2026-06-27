@@ -15,6 +15,7 @@ import pandas as pd
 
 from app.core.carregador_sql import carregar_query
 from app.core.gerenciador_conexoes import gerenciador_conexoes
+from app.relatorios._cores import COR_AMARELO, COR_AZUL, COR_AZUL_CLARO, COR_CINZA, COR_VERDE, COR_VERMELHO, COR_VERMELHO_CLARO
 
 # ---------------------------------------------------------------------------
 # Configuração
@@ -28,15 +29,6 @@ matplotlib.use("Agg")
 
 # Estilo visual limpo e profissional
 plt.style.use("seaborn-v0_8-whitegrid")
-
-# Paleta de cores do Nexus (azul corporativo + tons)
-COR_AZUL = "#2563eb"
-COR_VERDE = "#10b981"
-COR_VERMELHO = "#ef4444"
-COR_AMARELO = "#f59e0b"
-COR_CINZA = "#6b7280"
-COR_AZUL_CLARO = "#93c5fd"
-COR_VERMELHO_CLARO = "#fca5a5"
 
 PALETA_TIPOS = {
     "postgres": "#2563eb",

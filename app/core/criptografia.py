@@ -9,16 +9,7 @@ def _obter_fernet() -> Fernet:
 
 
 def criptografar(texto_puro: str) -> str:
-    """
-    a função criptograda um texto (ex: senha de banco)
-
-    Args:
-        texto_puro: string a ser criptografada (ex: "minhaSenha123")
-
-    Returns:
-        string criptografada para guardar no banco
-    """
-
+    """Criptografa um texto com Fernet (AES-128-CBC + HMAC). Retorna string base64 para salvar no banco."""
     fernet = _obter_fernet()
     bytes_criptografados = fernet.encrypt(texto_puro.encode())
     return bytes_criptografados.decode()
@@ -26,15 +17,10 @@ def criptografar(texto_puro: str) -> str:
 
 def descriptografar(texto_criptografado: str) -> str:
     """
-    essa aqui obviamente faz o contrario, descriptografa textos criptografados
-    Args:
-            texto_criptografado: string criptografada (vinda do banco)
+    Descriptografa um texto criptografado com Fernet.
 
-        Returns:
-            Texto original em texto puro.
-
-        Raises:
-            InvalidToken: se a chave for inválida ou o texto estiver corrompido
+    Raises:
+        cryptography.fernet.InvalidToken: se a chave estiver errada ou o texto corrompido.
     """
     fernet = _obter_fernet()
     bytes_descriptografados = fernet.decrypt(texto_criptografado.encode())

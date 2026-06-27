@@ -52,7 +52,11 @@ def _listar_pastas_validas(pasta_raiz: Path) -> list[Path]:
 
 
 def _sincronizar_relatorios() -> dict:
-    """Sincroniza pastas de app/relatorios/ com a tabela 'relatorios'."""
+    """
+    Sincroniza pastas de app/relatorios/ com a tabela 'relatorios'.
+    Análoga a _sincronizar_alertas — diferença: campos categoria/modo_execucao
+    em vez de severidade/cooldown_minutos.
+    """
     pastas_filesystem = _listar_pastas_validas(PASTA_RELATORIOS)
     nomes_filesystem = {p.name for p in pastas_filesystem}
 
@@ -182,7 +186,11 @@ def _sincronizar_relatorios() -> dict:
 
 
 def _sincronizar_alertas() -> dict:
-    """Sincroniza pastas de app/alertas/ com a tabela 'alertas'."""
+    """
+    Sincroniza pastas de app/alertas/ com a tabela 'alertas'.
+    Análoga a _sincronizar_relatorios — diferença: campos severidade/cooldown_minutos
+    em vez de categoria/modo_execucao.
+    """
     pastas_filesystem = _listar_pastas_validas(PASTA_ALERTAS)
     nomes_filesystem = {p.name for p in pastas_filesystem}
 

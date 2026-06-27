@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 
 from ._base import (
     engine, logger, templates, text,
-    _badge, _fmt_dt,
+    _badge, _formatar_datetime,
     _carregar_processador_relatorio,
 )
 
@@ -30,7 +30,7 @@ def _relatorios_db(busca: str = "", status_filtro: str = "") -> list[dict]:
     result = []
     for r in rows:
         d = dict(r)
-        d["ultimo_sync_fmt"] = _fmt_dt(d["ultimo_sync"])
+        d["ultimo_sync_fmt"] = _formatar_datetime(d["ultimo_sync"])
         result.append(d)
     return result
 

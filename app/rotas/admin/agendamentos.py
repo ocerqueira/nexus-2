@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 
 from ._base import (
     engine, logger, templates, text,
-    _badge, _fmt_dt,
+    _badge, _formatar_datetime,
     _usuarios_lista, _recursos_lista, _parse_horarios,
     _AG_USUARIOS_POR_PAGINA, calcular_proximo_envio,
 )
@@ -17,6 +17,11 @@ router = APIRouter()
 def _agendamentos_db(busca: str = "", tipo_filtro: str = "",
                      freq_filtro: str = "", status_filtro: str = "",
                      pagina: int = 1) -> tuple[list[dict], int]:
+    """
+    Retorna agendamentos agrupados por usuário para exibição na listagem.
+    A paginação é por usuário (não por agendamento individual) — cada página
+    mostra _AG_USUARIOS_POR_PAGINA usuários com todos os seus agendamentos.
+    """
     filtros = ["1=1"]
     params: dict = {}
     if busca:
@@ -59,7 +64,7 @@ def _agendamentos_db(busca: str = "", tipo_filtro: str = "",
             d["horarios_str"] = ", ".join(
                 f'{h["hora"]:02d}:{h["minuto"]:02d}' for h in horarios_raw
             ) if isinstance(horarios_raw, list) else str(horarios_raw)
-        d["proximo_envio_fmt"] = _fmt_dt(d.get("proximo_envio"))
+        d["proximo_envio_fmt"] = _formatar_datetime(d.get("proximo_envio"))
         canais = d.get("canais") or []
         d["canais"] = canais if isinstance(canais, list) else []
         if uid not in grupos:

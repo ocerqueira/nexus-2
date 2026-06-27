@@ -33,7 +33,7 @@ _POR_PAGINA = 20
 _HIST_POR_PAGINA = 25
 _PERM_USUARIOS_POR_PAGINA = 10
 _AG_USUARIOS_POR_PAGINA = 10
-_DESP_POR_PAG = 30
+_DESPACHOS_POR_PAGINA = 30
 
 _TZ_SP = ZoneInfo("America/Sao_Paulo")
 _TZ_UTC = ZoneInfo("UTC")
@@ -73,6 +73,11 @@ def _recursos_lista(tipo: str) -> list[dict]:
 
 
 def _parse_horarios(horarios_str: str) -> list[dict]:
+    """
+    Converte string de horários do formulário HTML para lista de dicts.
+    Formato esperado: "08:00,12:30,18:00"
+    Retorna: [{"hora": 8, "minuto": 0}, {"hora": 12, "minuto": 30}, ...]
+    """
     result = []
     for h in horarios_str.split(","):
         h = h.strip()
@@ -85,7 +90,8 @@ def _parse_horarios(horarios_str: str) -> list[dict]:
     return result
 
 
-def _fmt_dt(dt) -> str:
+def _formatar_datetime(dt) -> str:
+    """Converte datetime (UTC ou naive=UTC) para string local de São Paulo."""
     if not dt:
         return "—"
     if dt.tzinfo is None:
@@ -93,13 +99,18 @@ def _fmt_dt(dt) -> str:
     return dt.astimezone(_TZ_SP).strftime("%d/%m/%y %H:%M")
 
 
-def _fmt_date(dt) -> str:
+def _formatar_data(dt) -> str:
     if not dt:
         return "—"
     return dt.strftime("%d/%m/%Y")
 
 
 def _carregar_processador_relatorio(nome: str) -> dict | None:
+    """
+    Carrega dinamicamente a classe Processador* de app/relatorios/{nome}/processador.py.
+    Usa importlib para descobrir a classe sem precisar importar cada módulo no startup.
+    Retorna None se o config.json não existir ou o módulo não puder ser importado.
+    """
     if not (_PASTA_RELATORIOS / nome / "config.json").exists():
         return None
     try:
@@ -114,6 +125,10 @@ def _carregar_processador_relatorio(nome: str) -> dict | None:
 
 
 def _carregar_processador_alerta(nome: str):
+    """
+    Carrega dinamicamente a classe Processador* de app/alertas/{nome}/processador.py.
+    Mesma estratégia de _carregar_processador_relatorio, mas para alertas.
+    """
     try:
         mod = importlib.import_module(f"app.alertas.{nome}.processador")
     except ImportError:

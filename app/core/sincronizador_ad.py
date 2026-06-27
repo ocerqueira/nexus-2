@@ -61,16 +61,26 @@ class ResultadoSync:
     erros: list[str] = field(default_factory=list)
 
 
-def _attr(entrada, nome: str) -> str | None:
-    if nome not in entrada:
+def _ler_atributo_ldap(entrada_ldap, nome_atributo: str) -> str | None:
+    """
+    Lê um atributo de uma entrada LDAP (objeto ldap3).
+    Atributos podem retornar lista ou valor único dependendo do schema do AD;
+    sempre retornamos o primeiro elemento como string.
+    """
+    if nome_atributo not in entrada_ldap:
         return None
-    val = entrada[nome].value
+    val = entrada_ldap[nome_atributo].value
     if val is None:
         return None
     return str(val[0] if isinstance(val, list) else val) or None
 
 
 def _guid_hex(entrada) -> str | None:
+    """
+    Converte o objectGUID (bytes brutos do AD) para string hexadecimal.
+    Usado como chave estável de identificação — o sAMAccountName pode mudar,
+    o GUID não.
+    """
     try:
         raw = entrada["objectGUID"].raw_values
         return raw[0].hex() if raw else None
@@ -99,6 +109,18 @@ def _conectar() -> Connection:
 
 
 def sincronizar_ad(ou: str | None = None) -> ResultadoSync:
+    """
+    Sincroniza usuários do Active Directory com a tabela 'usuarios'.
+
+    Estratégia:
+      - UPSERT por 'identificador' (sAMAccountName): cria novos, atualiza existentes.
+      - Soft-delete: usuários presentes no banco mas ausentes do AD são marcados ativo=FALSE.
+      - Apenas contas habilitadas são sincronizadas (filtro LDAP exclui desabilitadas).
+
+    Args:
+        ou: Organizational Unit LDAP (ex: "OU=Usuarios,DC=empresa,DC=com").
+            Se None, usa AD_OU do .env.
+    """
     resultado = ResultadoSync()
 
     base = ou or configuracoes.ad_ou
@@ -122,7 +144,7 @@ def sincronizar_ad(ou: str | None = None) -> ResultadoSync:
 
     with engine.begin() as c:
         for entrada in entradas:
-            sam = _attr(entrada, "sAMAccountName")
+            sam = _ler_atributo_ldap(entrada, "sAMAccountName")
             if not sam:
                 continue
 
@@ -134,11 +156,11 @@ def sincronizar_ad(ou: str | None = None) -> ResultadoSync:
                     _SQL_UPSERT,
                     {
                         "ident": sam,
-                        "nome": _attr(entrada, "displayName") or sam,
-                        "email": _attr(entrada, "mail"),
-                        "telefone": _attr(entrada, "telephoneNumber") or _attr(entrada, "mobile"),
-                        "departamento": _attr(entrada, "department"),
-                        "cargo": _attr(entrada, "title"),
+                        "nome": _ler_atributo_ldap(entrada, "displayName") or sam,
+                        "email": _ler_atributo_ldap(entrada, "mail"),
+                        "telefone": _ler_atributo_ldap(entrada, "telephoneNumber") or _ler_atributo_ldap(entrada, "mobile"),
+                        "departamento": _ler_atributo_ldap(entrada, "department"),
+                        "cargo": _ler_atributo_ldap(entrada, "title"),
                         "metadados": metadados,
                     },
                 )

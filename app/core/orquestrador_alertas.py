@@ -82,7 +82,12 @@ def _buscar_destinatarios(alerta_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def _get_modo_teste() -> tuple[bool, str | None, str | None]:
+def _obter_modo_teste() -> tuple[bool, str | None, str | None]:
+    """
+    Retorna (modo_teste_ativo, email_teste, whatsapp_teste) das configurações do banco.
+    Em caso de falha (banco inacessível, tabela inexistente), retorna False
+    para não bloquear o disparo de alertas em produção.
+    """
     try:
         with engine.connect() as c:
             rows = c.execute(text(
@@ -105,6 +110,7 @@ def _em_cooldown_global(alerta: dict) -> tuple[bool, int]:
     if not ultimo:
         return False, 0
     if ultimo.tzinfo:
+        # Banco pode retornar timezone-aware; removemos para comparar com datetime.now() (naive)
         ultimo = ultimo.replace(tzinfo=None)
     proximo = ultimo + timedelta(minutes=alerta["cooldown_minutos"])
     agora = datetime.now()
@@ -398,6 +404,21 @@ def orquestrar_alerta(
     processador_classe: type,
     forcar: bool = False,
 ) -> dict[str, Any]:
+    """
+    Ponto de entrada principal para disparo de alertas.
+
+    Args:
+        nome_alerta:        Nome técnico do alerta (deve existir na tabela 'alertas').
+        parametros:         Dict de parâmetros passados ao processador.
+        processador_classe: Classe do processador (ex: ProcessadorConexoesInativas).
+        forcar:             Se True, ignora cooldown e fingerprints já disparados.
+
+    Returns:
+        Dict com deve_notificar, despachos criados e metadados de execução.
+
+    Raises:
+        AlertaNaoEncontrado: se o alerta não existir ou estiver inativo.
+    """
     # 1. Buscar alerta
     alerta = _buscar_alerta_no_banco(nome_alerta)
 
@@ -450,8 +471,8 @@ def orquestrar_alerta(
         else:
             itens_a_notificar = fps_dados
     else:
-        # Alerta sistêmico: fingerprint do estado global
-        fp_global = _fingerprint_global(dados) if not dados else _fingerprint_item(dados[0])
+        # Alerta sistêmico: fingerprint do estado global (dados sempre vazio neste branch)
+        fp_global = _fingerprint_global(dados)
         if not forcar:
             em_cd = _itens_em_cooldown(alerta["id"], [fp_global], alerta["cooldown_minutos"])
             itens_a_notificar = [] if em_cd else [(None, fp_global)]
@@ -475,7 +496,7 @@ def orquestrar_alerta(
     )
 
     # 6. Modo teste
-    modo_teste, test_email, test_whatsapp = _get_modo_teste()
+    modo_teste, test_email, test_whatsapp = _obter_modo_teste()
     if modo_teste:
         logger.warning(f"[MODO TESTE] '{nome_alerta}': substituindo {len(todos_dests)} destinatário(s)")
         todos_dests = [{
@@ -532,7 +553,7 @@ def orquestrar_alerta(
                 if payload:
                     did = _inserir_despacho(historico_id, alerta["id"], dest, canal, payload, enviar_apos=enviar_apos)
                     despachos_criados.append({
-                        "id": did, "status": "pendente" if not enviar_apos else "pendente",
+                        "id": did, "status": "pendente" if not enviar_apos else "agendado",
                         "canal": canal, "destino": destino,
                         "destinatario": dest.get("nome"),
                         "enviar_apos": enviar_apos.isoformat() if enviar_apos else None,

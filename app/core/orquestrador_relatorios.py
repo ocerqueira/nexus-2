@@ -109,7 +109,7 @@ def _buscar_usuario(usuario_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def _get_modo_teste() -> tuple[bool, str | None, str | None]:
+def _obter_modo_teste() -> tuple[bool, str | None, str | None]:
     try:
         with engine.connect() as c:
             rows = c.execute(text(
@@ -127,6 +127,11 @@ def _get_modo_teste() -> tuple[bool, str | None, str | None]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _calcular_enviar_apos(dest: dict) -> datetime | None:
+    """
+    Se o destinatário tem janela de silêncio ativa e agora está dentro dela,
+    retorna o próximo timestamp após o fim da janela (despacho agendado).
+    Janela pode cruzar meia-noite (ex: 22:00 → 06:00).
+    """
     if not dest.get("silencio_ativo"):
         return None
     inicio: time | None = dest.get("silencio_inicio")
@@ -283,7 +288,11 @@ def _inserir_despacho(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _comprimir_pdf(pdf_bytes: bytes) -> bytes:
-    """Tenta comprimir PDF com ghostscript. Retorna original se indisponível."""
+    """
+    Tenta comprimir PDF com ghostscript. Retorna original se indisponível.
+    Imports lazy (dentro da função) para não adicionar custo de startup quando
+    ghostscript não está instalado.
+    """
     import shutil, subprocess, tempfile, os
     if not shutil.which("gs"):
         return pdf_bytes
@@ -355,7 +364,7 @@ def orquestrar_relatorio(
     todos_dests = _merge_destinatarios(dest_fixos, dest_agendamento, usuario_avulso, canais_default)
 
     # Modo teste
-    modo_teste, test_email, test_whatsapp = _get_modo_teste()
+    modo_teste, test_email, test_whatsapp = _obter_modo_teste()
     if modo_teste and todos_dests:
         logger.warning(f"[MODO TESTE] '{nome_relatorio}': substituindo {len(todos_dests)} destinatário(s)")
         todos_dests = [{
