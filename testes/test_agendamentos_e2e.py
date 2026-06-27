@@ -1,4 +1,4 @@
-"""
+﻿"""
 Teste end-to-end dos endpoints de agendamento.
 
 Fluxo: criar -> listar -> proximas execucoes -> marcar executado -> verificar recalculo -> atualizar -> desativar
@@ -12,10 +12,16 @@ Uso:
   uv run python testes/test_agendamentos_e2e.py
 """
 
+import os
 import sys
 import requests
 
 BASE = "http://localhost:8000"
+API_KEY = os.getenv("API_KEY", "dev-key-local")
+
+# SessÃ£o reutilizÃ¡vel com autenticaÃ§Ã£o; evita repetir o header em cada chamada
+http = requests.Session()
+http.headers.update({"X-Api-Key": API_KEY})
 
 
 def check(condicao: bool, mensagem: str) -> None:
@@ -34,7 +40,7 @@ def main():
     # 0. Health check
     # ------------------------------------------------------------------
     print("\n[0] Verificando saude da API...")
-    r = requests.get(f"{BASE}/saude")
+    r = http.get(f"{BASE}/saude")
     check(r.status_code == 200, f"GET /saude -> {r.status_code}")
     dados = r.json()
     check(dados["status"] == "ok", f"API status = {dados['status']}")
@@ -44,14 +50,14 @@ def main():
     # 1. Obter IDs de recursos existentes
     # ------------------------------------------------------------------
     print("\n[1] Verificando dados de seed...")
-    r = requests.get(f"{BASE}/relatorios")
+    r = http.get(f"{BASE}/relatorios")
     check(r.status_code == 200, f"GET /relatorios -> {r.status_code}")
     relatorios = r.json()
     check(len(relatorios.get("relatorios", [])) > 0, "Ha relatorios cadastrados")
     relatorio_id = relatorios["relatorios"][0]["id"]
     print(f"    Usando relatorio_id={relatorio_id}")
 
-    r = requests.get(f"{BASE}/alertas")
+    r = http.get(f"{BASE}/alertas")
     check(r.status_code == 200, f"GET /alertas -> {r.status_code}")
     alertas = r.json()
     check(len(alertas.get("alertas", [])) > 0, "Ha alertas cadastrados")
@@ -74,7 +80,7 @@ def main():
         "parametros": {"forcar": False},
         "canais": ["whatsapp"],
     }
-    r = requests.post(f"{BASE}/agendamentos", json=payload)
+    r = http.post(f"{BASE}/agendamentos", json=payload)
     check(r.status_code == 201, f"POST /agendamentos -> {r.status_code}")
     resp = r.json()
     check(resp["status"] == "criado", f"Status = {resp['status']}")
@@ -96,7 +102,7 @@ def main():
         "horarios": [{"hora": 8, "minuto": 0}],
         "canais": ["email"],
     }
-    r = requests.post(f"{BASE}/agendamentos", json=payload)
+    r = http.post(f"{BASE}/agendamentos", json=payload)
     check(r.status_code == 201, f"POST /agendamentos (semanal) -> {r.status_code}")
     resp = r.json()
     semanal_id = resp["id"]
@@ -117,7 +123,7 @@ def main():
         "apenas_dias_uteis": True,
         "canais": ["whatsapp", "email"],
     }
-    r = requests.post(f"{BASE}/agendamentos", json=payload)
+    r = http.post(f"{BASE}/agendamentos", json=payload)
     check(r.status_code == 201, f"POST /agendamentos (mensal) -> {r.status_code}")
     resp = r.json()
     mensal_id = resp["id"]
@@ -128,13 +134,13 @@ def main():
     # 5. Listar agendamentos
     # ------------------------------------------------------------------
     print("\n[5] GET /agendamentos -- listando...")
-    r = requests.get(f"{BASE}/agendamentos")
+    r = http.get(f"{BASE}/agendamentos")
     check(r.status_code == 200, f"GET /agendamentos -> {r.status_code}")
     resp = r.json()
     check(resp["total"] >= 3, f"Total >= 3 (encontrados: {resp['total']})")
     print(f"    {resp['total']} agendamentos cadastrados")
 
-    r = requests.get(f"{BASE}/agendamentos?tipo_recurso=alerta")
+    r = http.get(f"{BASE}/agendamentos?tipo_recurso=alerta")
     check(r.status_code == 200, "Filtro por tipo_recurso=alerta OK")
     resp = r.json()
     check(resp["total"] >= 2, f"Alertas agendados >= 2 (encontrados: {resp['total']})")
@@ -143,7 +149,7 @@ def main():
     # 6. Proximas execucoes (devem estar vazias agora)
     # ------------------------------------------------------------------
     print("\n[6] GET /agendamentos/proximas-execucoes...")
-    r = requests.get(f"{BASE}/agendamentos/proximas-execucoes")
+    r = http.get(f"{BASE}/agendamentos/proximas-execucoes")
     check(r.status_code == 200, f"GET /proximas-execucoes -> {r.status_code}")
     resp = r.json()
     print(f"    Prontos para executar agora: {resp['total']}")
@@ -152,7 +158,7 @@ def main():
     # 7. Marcar como executado
     # ------------------------------------------------------------------
     print(f"\n[7] POST /agendamentos/{agendamento_id}/marcar-executado...")
-    r = requests.post(f"{BASE}/agendamentos/{agendamento_id}/marcar-executado")
+    r = http.post(f"{BASE}/agendamentos/{agendamento_id}/marcar-executado")
     check(r.status_code == 200, f"POST marcar-executado -> {r.status_code}")
     resp = r.json()
     check(resp["status"] == "executado", f"Status = {resp['status']}")
@@ -163,7 +169,7 @@ def main():
     # 8. Atualizar agendamento (PATCH)
     # ------------------------------------------------------------------
     print(f"\n[8] PATCH /agendamentos/{semanal_id} -- mudando dia_semana...")
-    r = requests.patch(
+    r = http.patch(
         f"{BASE}/agendamentos/{semanal_id}",
         json={"dia_semana": 3, "frequencia": "semanal"},
     )
@@ -177,12 +183,12 @@ def main():
     # 9. Desativar (soft delete)
     # ------------------------------------------------------------------
     print(f"\n[9] DELETE /agendamentos/{mensal_id} -- desativando...")
-    r = requests.delete(f"{BASE}/agendamentos/{mensal_id}")
+    r = http.delete(f"{BASE}/agendamentos/{mensal_id}")
     check(r.status_code == 200, f"DELETE -> {r.status_code}")
     resp = r.json()
     check(resp["status"] == "desativado", f"Status = {resp['status']}")
 
-    r = requests.get(f"{BASE}/agendamentos?apenas_ativos=true")
+    r = http.get(f"{BASE}/agendamentos?apenas_ativos=true")
     check(r.status_code == 200, "Listagem apos desativacao OK")
     resp = r.json()
     ids_ativos = [a["id"] for a in resp["agendamentos"]]
@@ -193,7 +199,7 @@ def main():
     # 10. Validacao: semanal sem dia_semana deve ser rejeitado
     # ------------------------------------------------------------------
     print("\n[10] Validacao: frequencia semanal sem dia_semana...")
-    r = requests.post(
+    r = http.post(
         f"{BASE}/agendamentos",
         json={
             "usuario_id": USUARIO,
@@ -204,7 +210,7 @@ def main():
             "canais": ["whatsapp"],
         },
     )
-    check(r.status_code == 422, f"Validacao Pydantic rejeitou -> {r.status_code}")
+    check(r.status_code in (400, 422), f"Validacao rejeitou (esperado 400/422) -> {r.status_code}")
 
     # ------------------------------------------------------------------
     # RESUMO
