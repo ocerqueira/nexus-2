@@ -63,8 +63,8 @@ def solicitar_relatorio(
     nome_relatorio: str = Path(description="Nome técnico do relatório (ex: 'pedidos_por_vendedor', 'dashboard_conexoes')"),
     requisicao: RequisicaoRelatorio | None = None,
     formato: str = Query("json", description="Formato de saída: 'json' (dados), 'html' (página) ou 'pdf' (documento binário)"),
-    notificar: bool = Query(False, description="Se True, cria despachos para destinatários configurados"),
-    usuario_id: int | None = Query(None, description="ID do usuário solicitante (para despacho on-demand)"),
+    notificar: bool = Query(False, description="Se True, cria entregas para destinatários configurados"),
+    usuario_id: int | None = Query(None, description="ID do usuário solicitante (para entrega on-demand)"),
     agendamento_id: int | None = Query(None, description="ID do agendamento que originou esta solicitação"),
 ):
     """
@@ -75,9 +75,9 @@ def solicitar_relatorio(
     - **html**: visualização para email/web — retorna HTML renderizado
     - **pdf**: documento para download — retorna PDF binário com Content-Disposition: attachment
 
-    Com `notificar=true`, cria despachos no banco para os destinatários configurados
+    Com `notificar=true`, cria entregas no banco para os destinatários configurados
     (relatorios_destinatarios + agendamentos_destinatarios + usuario_id avulso).
-    Os despachos são processados pelo workflow `nexus_despachos_sender` no N8N.
+    As entregas são processadas pelo workflow `nexus_entregas_sender` no N8N.
     """
     # 1. Validar formato
     formatos_validos = ["json", "html", "pdf", "base64"]
@@ -115,11 +115,11 @@ def solicitar_relatorio(
         logger.error(f"Erro ao processar: {erro}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro: {erro!s}")
 
-    # 5. Criar despachos se solicitado
-    despachos_info = None
+    # 5. Criar entregas se solicitado
+    entregas_info = None
     if notificar:
         try:
-            despachos_info = orquestrar_relatorio(
+            entregas_info = orquestrar_relatorio(
                 nome_relatorio=nome_relatorio,
                 processador_classe=info_relatorio["classe"],
                 titulo=info_relatorio["titulo"],
@@ -130,7 +130,7 @@ def solicitar_relatorio(
                 comprimir_pdf=True,
             )
         except Exception as e:
-            logger.error(f"Erro ao criar despachos para '{nome_relatorio}': {e}", exc_info=True)
+            logger.error(f"Erro ao criar entregas para '{nome_relatorio}': {e}", exc_info=True)
 
     # 6. Retornar conforme formato
     if formato == "json":
@@ -139,8 +139,8 @@ def solicitar_relatorio(
             "relatorio": nome_relatorio,
             "payload": dados,
         }
-        if despachos_info:
-            resp["despachos"] = despachos_info
+        if entregas_info:
+            resp["entregas"] = entregas_info
         return resp
 
     elif formato == "html":
@@ -180,8 +180,8 @@ def solicitar_relatorio(
             "pdf_base64": base64.b64encode(pdf).decode(),
             "filename": f"{nome_relatorio}.pdf",
         }
-        if despachos_info:
-            resp["despachos"] = despachos_info
+        if entregas_info:
+            resp["entregas"] = entregas_info
         return resp
 
 

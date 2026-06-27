@@ -3,19 +3,19 @@ Renderizador de mensagens de alertas.
 Renderiza templates Jinja2 por canal e modo.
 
 Conceito atual: alertas WhatsApp são sempre enviados em modo 'individual'
-(1 despacho por item detectado). O modo 'agrupado' existe no código mas
+(1 entrega por item detectado). O modo 'agrupado' existe no código mas
 não é o fluxo ativo — cada ocorrência gera sua própria mensagem.
 
 Convenção de arquivos em alertas/{nome}/mensagens/:
-  whatsapp_individual.txt         → WhatsApp, 1 despacho por item  ← fluxo ativo
+  whatsapp_individual.txt         → WhatsApp, 1 entrega por item   ← fluxo ativo
   email_individual_assunto.txt    → Email individual: linha de assunto
   email_individual_html.html      → Email individual: corpo HTML
   email_consolidado_assunto.txt   → Email agrupado: linha de assunto
   email_consolidado_html.html     → Email agrupado: corpo HTML
   sms_individual.txt              → SMS individual (futuro)
 
-API canônica: renderizar_despacho(nome_alerta, canal, modo, contexto)
-Retorna dict com payload pronto para inserir em despachos.payload.
+API canônica: renderizar_entrega(nome_alerta, canal, modo, contexto)
+Retorna dict com payload pronto para inserir em entregas.payload.
 """
 
 import logging
@@ -83,7 +83,7 @@ def _contexto_base(contexto: dict) -> dict:
 # API CANÔNICA
 # ─────────────────────────────────────────────────────────────────────────────
 
-def renderizar_despacho(
+def renderizar_entrega(
     nome_alerta: str,
     canal: str,
     modo: str,
@@ -91,7 +91,7 @@ def renderizar_despacho(
     linha: dict | None = None,
 ) -> dict | None:
     """
-    Renderiza payload para um despacho específico.
+    Renderiza payload para uma entrega específica.
 
     Args:
         nome_alerta: Nome técnico do alerta (pasta em app/alertas/)
@@ -101,7 +101,7 @@ def renderizar_despacho(
         linha:       Dados de UM item específico (apenas para modo='individual')
 
     Returns:
-        Dict com payload renderizado pronto para despachos.payload:
+        Dict com payload renderizado pronto para entregas.payload:
           whatsapp → {"mensagem": "..."}
           email    → {"assunto": "...", "html": "..."}
           sms      → {"texto": "..."}
@@ -157,13 +157,13 @@ def renderizar_mensagens_individuais(
     contexto_base: dict,
     linha: dict,
 ) -> dict[str, str]:
-    """Legado. Use renderizar_despacho(canal='whatsapp'|'email', modo='individual')."""
+    """Legado. Use renderizar_entrega(canal='whatsapp' | 'email', modo='individual')."""
     resultado = {}
     for canal, chave_wp, chave_as, chave_html in [
         ("whatsapp", "whatsapp", None, None),
         ("email",    None, "email_assunto", "email_html"),
     ]:
-        payload = renderizar_despacho(nome_alerta, canal, "individual", contexto_base, linha)
+        payload = renderizar_entrega(nome_alerta, canal, "individual", contexto_base, linha)
         if payload:
             if canal == "whatsapp":
                 resultado["whatsapp"] = payload.get("mensagem", "")
@@ -179,10 +179,10 @@ def renderizar_mensagens_consolidadas(
     nome_alerta: str,
     contexto: dict,
 ) -> dict[str, str]:
-    """Legado — modo consolidado não é mais utilizado para WhatsApp. Use renderizar_despacho(modo='individual')."""
+    """Legado — modo consolidado não é mais utilizado para WhatsApp. Use renderizar_entrega(modo='individual')."""
     resultado = {}
     for canal in ("whatsapp", "email"):
-        payload = renderizar_despacho(nome_alerta, canal, "agrupado", contexto)
+        payload = renderizar_entrega(nome_alerta, canal, "agrupado", contexto)
         if payload:
             if canal == "whatsapp":
                 resultado["whatsapp"] = payload.get("mensagem", "")

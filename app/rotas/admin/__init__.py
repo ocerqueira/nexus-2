@@ -6,7 +6,7 @@ Não aparece no Swagger (include_in_schema=False).
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from . import agendamentos, alertas, conexoes, dashboard, despachos, permissoes, relatorios, testes, usuarios
+from . import agendamentos, alertas, conexoes, dashboard, entregas, permissoes, relatorios, testes, usuarios
 from ._base import templates
 
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -23,5 +23,5 @@ router.include_router(conexoes.router)
 router.include_router(usuarios.router)
 router.include_router(agendamentos.router)
 router.include_router(permissoes.router)
-router.include_router(despachos.router)
+router.include_router(entregas.router)
 router.include_router(testes.router)

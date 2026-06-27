@@ -1,9 +1,9 @@
 """
 Orquestrador de relatórios.
-Resolve destinatários, gera PDF/resumo e cria despachos rastreáveis.
+Resolve destinatários, gera PDF/resumo e cria entregas rastreáveis.
 
 Modos de execução (relatorios.modo_execucao):
-  'unico'            → 1 execução do processador → N despachos com o mesmo PDF
+  'unico'            → 1 execução do processador → N entregas com o mesmo PDF
   'por_destinatario' → 1 execução por destinatário usando filtro_parametros → N PDFs diferentes
 
 Fontes de destinatários (em ordem de prioridade/merge):
@@ -129,7 +129,7 @@ def _obter_modo_teste() -> tuple[bool, str | None, str | None]:
 def _calcular_enviar_apos(dest: dict) -> datetime | None:
     """
     Se o destinatário tem janela de silêncio ativa e agora está dentro dela,
-    retorna o próximo timestamp após o fim da janela (despacho agendado).
+    retorna o próximo timestamp após o fim da janela (entrega agendada).
     Janela pode cruzar meia-noite (ex: 22:00 → 06:00).
     """
     if not dest.get("silencio_ativo"):
@@ -222,10 +222,10 @@ def _merge_destinatarios(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Histórico + despachos
+# Histórico + entregas
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _registrar_historico(relatorio: dict, parametros: dict, total_despachos: int) -> int | None:
+def _registrar_historico(relatorio: dict, parametros: dict, total_entregas: int) -> int | None:
     try:
         with engine.begin() as c:
             row = c.execute(text("""
@@ -239,7 +239,7 @@ def _registrar_historico(relatorio: dict, parametros: dict, total_despachos: int
             """), {
                 "rid":    relatorio["id"],
                 "rnome":  relatorio["nome"],
-                "params": json.dumps({**parametros, "total_despachos": total_despachos}),
+                "params": json.dumps({**parametros, "total_entregas": total_entregas}),
             }).scalar()
         return row
     except Exception as e:
@@ -247,7 +247,7 @@ def _registrar_historico(relatorio: dict, parametros: dict, total_despachos: int
         return None
 
 
-def _inserir_despacho(
+def _inserir_entrega(
     historico_id: int | None,
     relatorio_id: int,
     dest: dict,
@@ -266,7 +266,7 @@ def _inserir_despacho(
 
     with engine.begin() as c:
         row = c.execute(text("""
-            INSERT INTO despachos
+            INSERT INTO entregas
                 (historico_id, relatorio_id, usuario_id, canal, destino, payload, status, enviar_apos)
             VALUES
                 (:hid, :rid, :uid, :canal, :destino, :payload, 'pendente', :enviar_apos)
@@ -349,7 +349,7 @@ def orquestrar_relatorio(
         comprimir_pdf:          Se True, tenta compressão via ghostscript
 
     Returns:
-        Dict com despachos criados e metadados.
+        Dict com entregas criadas e metadados.
     """
     relatorio = _buscar_relatorio(nome_relatorio)
     if not relatorio:
@@ -378,7 +378,7 @@ def orquestrar_relatorio(
     parametros = resolver_tokens(parametros)
 
     modo_execucao = relatorio.get("modo_execucao", "unico")
-    despachos_criados: list[dict] = []
+    entregas_criadas: list[dict] = []
 
     historico_id = _registrar_historico(relatorio, parametros, 0)
 
@@ -420,7 +420,7 @@ def orquestrar_relatorio(
                 )
                 pdf_full = _gerar_e_comprimir(nome_relatorio, dados, titulo, subtitulo, comprimir_pdf) if precisa_pdf_full else None
                 for dest in dest_full:
-                    despachos_criados.extend(_despachar_relatorio(
+                    entregas_criadas.extend(_entregar_relatorio(
                         historico_id, relatorio["id"], dest, pdf_full, resumo,
                     ))
 
@@ -440,7 +440,7 @@ def orquestrar_relatorio(
                     logger.error(f"Erro ao gerar PDF para grupo {dest_g.get('nome')}: {e}")
                     continue
 
-                despachos_criados.extend(_despachar_relatorio(
+                entregas_criadas.extend(_entregar_relatorio(
                     historico_id, relatorio["id"], dest_g, pdf_g, resumo_g,
                 ))
 
@@ -458,7 +458,7 @@ def orquestrar_relatorio(
             pdf_bytes = _gerar_e_comprimir(nome_relatorio, dados, titulo, subtitulo, comprimir_pdf) if precisa_pdf else None
 
             for dest in todos_dests:
-                despachos_criados.extend(_despachar_relatorio(
+                entregas_criadas.extend(_entregar_relatorio(
                     historico_id, relatorio["id"], dest, pdf_bytes, resumo,
                 ))
 
@@ -481,7 +481,7 @@ def orquestrar_relatorio(
                 logger.error(f"Erro ao gerar relatório para {dest.get('nome')}: {e}")
                 continue
 
-            despachos_criados.extend(_despachar_relatorio(
+            entregas_criadas.extend(_entregar_relatorio(
                 historico_id, relatorio["id"], dest, pdf_bytes, resumo,
             ))
 
@@ -491,7 +491,7 @@ def orquestrar_relatorio(
             "nome": relatorio["nome"],
         },
         "total_destinatarios": len(todos_dests),
-        "despachos": [d for d in despachos_criados if d.get("status") == "pendente"],
+        "entregas": [d for d in entregas_criadas if d.get("status") == "pendente"],
         "historico_id": historico_id,
     }
 
@@ -509,14 +509,14 @@ def _gerar_e_comprimir(
     return pdf
 
 
-def _despachar_relatorio(
+def _entregar_relatorio(
     historico_id: int | None,
     relatorio_id: int,
     dest: dict,
     pdf_bytes: bytes | None,
     resumo: str,
 ) -> list[dict]:
-    """Cria despachos para todos os canais de um destinatário."""
+    """Cria entregas para todos os canais de um destinatário."""
     import base64
     resultado = []
     canais = dest.get("canais") or ["whatsapp"]
@@ -553,7 +553,7 @@ def _despachar_relatorio(
             logger.warning(f"Destinatário {dest.get('nome')} sem {canal} — ignorado")
             continue
 
-        did = _inserir_despacho(historico_id, relatorio_id, dest, canal, payload, enviar_apos)
+        did = _inserir_entrega(historico_id, relatorio_id, dest, canal, payload, enviar_apos)
         resultado.append({
             "id": did, "status": "pendente",
             "canal": canal, "destino": destino,

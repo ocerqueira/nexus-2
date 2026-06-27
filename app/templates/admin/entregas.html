@@ -22,7 +22,7 @@
     <input type="text" name="busca" value="{{ busca }}"
            placeholder="Alerta, relatório, dest..."
            class="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
-           hx-get="/admin/despachos" hx-trigger="keyup changed delay:400ms"
+           hx-get="/admin/entregas" hx-trigger="keyup changed delay:400ms"
            hx-target="#main" hx-swap="innerHTML"
            hx-include="[name='status'],[name='canal']">
   </div>
@@ -40,7 +40,7 @@
     <button type="button"
             class="px-2.5 py-1.5 text-xs rounded-full border transition-colors
                    {{ 'bg-indigo-600 text-white border-indigo-600' if status == val else 'bg-white text-slate-600 border-slate-200 hover:border-slate-400' }}"
-            hx-get="/admin/despachos?status={{ val }}&canal={{ canal }}&busca={{ busca }}"
+            hx-get="/admin/entregas?status={{ val }}&canal={{ canal }}&busca={{ busca }}"
             hx-target="#main" hx-swap="innerHTML">{{ label }}</button>
     {% endfor %}
   </div>
@@ -51,12 +51,12 @@
     <button type="button"
             class="px-2.5 py-1.5 text-xs rounded-full border transition-colors
                    {{ 'bg-slate-700 text-white border-slate-700' if canal == val else 'bg-white text-slate-600 border-slate-200 hover:border-slate-400' }}"
-            hx-get="/admin/despachos?canal={{ val }}&status={{ status }}&busca={{ busca }}"
+            hx-get="/admin/entregas?canal={{ val }}&status={{ status }}&busca={{ busca }}"
             hx-target="#main" hx-swap="innerHTML">{{ label }}</button>
     {% endfor %}
   </div>
 
-  <span class="ml-auto text-xs text-slate-400">{{ total }} despacho(s)</span>
+  <span class="ml-auto text-xs text-slate-400">{{ total }} entrega(s)</span>
 
   <input type="hidden" name="status" value="{{ status }}">
   <input type="hidden" name="canal"  value="{{ canal }}">
@@ -69,7 +69,7 @@
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
           d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
   </svg>
-  <p class="text-slate-400">Nenhum despacho encontrado</p>
+  <p class="text-slate-400">Nenhuma entrega encontrada</p>
 </div>
 {% else %}
 <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
@@ -114,5 +114,5 @@
 {% endif %}
 
 {# ── Paginação ─────────────────────────────────────────── #}
-{% set url_base = "/admin/despachos?status=" ~ status ~ "&canal=" ~ canal ~ "&busca=" ~ busca %}
-{{ paginacao(pagina, total_paginas, total, "despacho(s)", url_base) }}
+{% set url_base = "/admin/entregas?status=" ~ status ~ "&canal=" ~ canal ~ "&busca=" ~ busca %}
+{{ paginacao(pagina, total_paginas, total, "entrega(s)", url_base) }}

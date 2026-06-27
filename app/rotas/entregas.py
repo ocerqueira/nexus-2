@@ -1,9 +1,9 @@
 """
-Rotas de despachos.
+Rotas de entregas.
 
-GET  /despachos/pendentes    — N8N polling: busca despachos prontos para envio
-PATCH /despachos/{id}/status — N8N callback: atualiza status após envio/falha
-GET  /despachos              — Admin: listagem com filtros
+GET  /entregas/pendentes    — N8N polling: busca entregas prontas para envio
+PATCH /entregas/{id}/status — N8N callback: atualiza status após envio/falha
+GET  /entregas              — Admin: listagem com filtros
 """
 
 import logging
@@ -17,7 +17,7 @@ from app.bd import engine
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/despachos", tags=["despachos"])
+router = APIRouter(prefix="/entregas", tags=["entregas"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -26,12 +26,12 @@ router = APIRouter(prefix="/despachos", tags=["despachos"])
 
 @router.get("/pendentes")
 def listar_pendentes(
-    limite: int = Query(50, ge=1, le=200, description="Máximo de despachos a retornar por chamada"),
+    limite: int = Query(50, ge=1, le=200, description="Máximo de entregas a retornar por chamada"),
     canal:  str | None = Query(None, description="Filtrar por canal: whatsapp | email"),
     incluir_retry: bool = Query(False, description="Se True, inclui falhos com menos de 3 tentativas nas últimas 24h"),
 ) -> dict:
     """
-    Retorna despachos prontos para envio.
+    Retorna entregas prontas para envio.
 
     Retorna: status='pendente' com enviar_apos <= NOW() (ou NULL).
     Com incluir_retry=true: também retorna status='falhou' com tentativas < 3
@@ -60,7 +60,7 @@ def listar_pendentes(
                 d.acao_requerida,
                 a.nome  AS alerta_nome,
                 r.nome  AS relatorio_nome
-            FROM despachos d
+            FROM entregas d
             LEFT JOIN alertas    a ON a.id = d.alerta_id
             LEFT JOIN relatorios r ON r.id = d.relatorio_id
             WHERE (
@@ -74,7 +74,7 @@ def listar_pendentes(
 
     return {
         "total": len(rows),
-        "despachos": [dict(r) for r in rows],
+        "entregas": [dict(r) for r in rows],
     }
 
 
@@ -88,13 +88,13 @@ class AtualizarStatusBody(BaseModel):
     tentativas:  int | None = None
 
 
-@router.patch("/{despacho_id}/status")
+@router.patch("/{entrega_id}/status")
 def atualizar_status(
-    despacho_id: int,
+    entrega_id: int,
     body: AtualizarStatusBody,
 ) -> dict:
     """
-    Atualiza status de um despacho após tentativa de envio pelo N8N.
+    Atualiza status de uma entrega após tentativa de envio pelo N8N.
 
     Status válidos: enviado | falhou | confirmado | cancelado
     """
@@ -107,15 +107,15 @@ def atualizar_status(
 
     with engine.connect() as c:
         existe = c.execute(
-            text("SELECT id FROM despachos WHERE id = :id"),
-            {"id": despacho_id},
+            text("SELECT id FROM entregas WHERE id = :id"),
+            {"id": entrega_id},
         ).scalar()
 
     if not existe:
-        raise HTTPException(status_code=404, detail=f"Despacho {despacho_id} não encontrado")
+        raise HTTPException(status_code=404, detail=f"Entrega {entrega_id} não encontrada")
 
     agora = datetime.now()
-    campos = {"id": despacho_id, "status": body.status, "agora": agora}
+    campos = {"id": entrega_id, "status": body.status, "agora": agora}
     sets = ["status = :status"]
 
     if body.status == "enviado":
@@ -132,12 +132,12 @@ def atualizar_status(
 
     with engine.begin() as c:
         c.execute(
-            text(f"UPDATE despachos SET {', '.join(sets)} WHERE id = :id"),
+            text(f"UPDATE entregas SET {', '.join(sets)} WHERE id = :id"),
             campos,
         )
 
-    logger.info(f"Despacho {despacho_id} → {body.status}")
-    return {"id": despacho_id, "status": body.status}
+    logger.info(f"Entrega {entrega_id} → {body.status}")
+    return {"id": entrega_id, "status": body.status}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ def atualizar_status(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("")
-def listar_despachos(
+def listar_entregas(
     status:        str | None = Query(None),
     canal:         str | None = Query(None),
     alerta_nome:   str | None = Query(None),
@@ -153,7 +153,7 @@ def listar_despachos(
     pagina:        int = Query(1, ge=1),
     por_pagina:    int = Query(25, ge=1, le=100),
 ) -> dict:
-    """Lista despachos com filtros e paginação para o admin panel."""
+    """Lista entregas com filtros e paginação para o admin panel."""
     filtros = []
     params: dict = {"limite": por_pagina, "offset": (pagina - 1) * por_pagina}
 
@@ -174,7 +174,7 @@ def listar_despachos(
 
     with engine.connect() as c:
         total = c.execute(text(f"""
-            SELECT COUNT(*) FROM despachos d
+            SELECT COUNT(*) FROM entregas d
             LEFT JOIN alertas    a ON a.id = d.alerta_id
             LEFT JOIN relatorios r ON r.id = d.relatorio_id
             {where}
@@ -189,7 +189,7 @@ def listar_despachos(
                 u.nome  AS destinatario_nome,
                 a.nome  AS alerta_nome,
                 r.nome  AS relatorio_nome
-            FROM despachos d
+            FROM entregas d
             LEFT JOIN usuarios   u ON u.id = d.usuario_id
             LEFT JOIN alertas    a ON a.id = d.alerta_id
             LEFT JOIN relatorios r ON r.id = d.relatorio_id
@@ -202,5 +202,5 @@ def listar_despachos(
         "total":    total,
         "pagina":   pagina,
         "por_pagina": por_pagina,
-        "despachos": [dict(r) for r in rows],
+        "entregas": [dict(r) for r in rows],
     }

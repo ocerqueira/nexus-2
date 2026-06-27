@@ -3,15 +3,15 @@ import json
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 
-from ._base import engine, templates, text, _formatar_datetime, _DESPACHOS_POR_PAGINA, _HIST_POR_PAGINA
+from ._base import engine, templates, text, _formatar_datetime, _ENTREGAS_POR_PAGINA, _HIST_POR_PAGINA
 
 router = APIRouter()
 
 
-def _despachos_db(status: str = "", canal: str = "", busca: str = "",
+def _entregas_db(status: str = "", canal: str = "", busca: str = "",
                   pagina: int = 1) -> tuple[list[dict], int]:
     filtros = ["1=1"]
-    params: dict = {"lim": _DESPACHOS_POR_PAGINA, "off": (pagina - 1) * _DESPACHOS_POR_PAGINA}
+    params: dict = {"lim": _ENTREGAS_POR_PAGINA, "off": (pagina - 1) * _ENTREGAS_POR_PAGINA}
     if status:
         filtros.append("d.status = :status")
         params["status"] = status
@@ -24,7 +24,7 @@ def _despachos_db(status: str = "", canal: str = "", busca: str = "",
     where = " AND ".join(filtros)
     with engine.connect() as c:
         total = c.execute(text(f"""
-            SELECT COUNT(*) FROM despachos d
+            SELECT COUNT(*) FROM entregas d
             LEFT JOIN alertas al ON al.id = d.alerta_id
             LEFT JOIN relatorios rel ON rel.id = d.relatorio_id
             LEFT JOIN usuarios u ON u.id = d.usuario_id
@@ -35,7 +35,7 @@ def _despachos_db(status: str = "", canal: str = "", busca: str = "",
                    d.enviar_apos, d.criado_em, d.ultimo_erro,
                    al.nome AS alerta_nome, rel.nome AS relatorio_nome,
                    u.nome AS usuario_nome
-            FROM despachos d
+            FROM entregas d
             LEFT JOIN alertas al ON al.id = d.alerta_id
             LEFT JOIN relatorios rel ON rel.id = d.relatorio_id
             LEFT JOIN usuarios u ON u.id = d.usuario_id
@@ -96,19 +96,19 @@ def _historico_db(tipo: str = "", status: str = "", busca: str = "",
     return result, total
 
 
-@router.get("/despachos", response_class=HTMLResponse)
-def admin_despachos_view(request: Request,
+@router.get("/entregas", response_class=HTMLResponse)
+def admin_entregas_view(request: Request,
                          status: str = Query(""),
                          canal: str = Query(""),
                          busca: str = Query(""),
                          pagina: int = Query(1, ge=1)):
-    registros, total = _despachos_db(status, canal, busca, pagina)
-    return templates.TemplateResponse(request, "admin/despachos.html", {
+    registros, total = _entregas_db(status, canal, busca, pagina)
+    return templates.TemplateResponse(request, "admin/entregas.html", {
         "registros": registros, "total": total,
         "status": status, "canal": canal, "busca": busca,
         "pagina": pagina,
         # -(-total // limit) = divisão inteira com arredondamento para cima (teto)
-        "total_paginas": max(1, -(-total // _DESPACHOS_POR_PAGINA)),
+        "total_paginas": max(1, -(-total // _ENTREGAS_POR_PAGINA)),
     })
 
 

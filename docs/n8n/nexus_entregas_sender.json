@@ -1,5 +1,5 @@
 {
-  "name": "Nexus — Despachos Sender",
+  "name": "Nexus — Entregas Sender",
   "_info": {
     "n8n": "1.122.5",
     "evolution": "2.3.3 (exchange)",
@@ -48,13 +48,13 @@
 
     {
       "id": "get-pendentes",
-      "name": "GET — despachos/pendentes",
+      "name": "GET — entregas/pendentes",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [440, 300],
       "parameters": {
         "method": "GET",
-        "url": "={{ $json.NEXUS_URL }}/despachos/pendentes?limite=50&incluir_retry=true",
+        "url": "={{ $json.NEXUS_URL }}/entregas/pendentes?limite=50&incluir_retry=true",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -67,7 +67,7 @@
 
     {
       "id": "if-tem",
-      "name": "IF — tem despachos?",
+      "name": "IF — tem entregas?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [660, 300],
@@ -88,12 +88,12 @@
 
     {
       "id": "split",
-      "name": "Split Out — despachos",
+      "name": "Split Out — entregas",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
       "position": [880, 300],
       "parameters": {
-        "fieldToSplitOut": "despachos",
+        "fieldToSplitOut": "entregas",
         "options": {}
       }
     },
@@ -227,13 +227,13 @@
       "typeVersion": 2,
       "position": [1780, 280],
       "parameters": {
-        "jsCode": "const item = $input.first();\n\nlet despachoId = null;\nlet tentativasAnterior = 0;\ntry {\n  const original = $('Split Out — despachos').item.json;\n  despachoId = original.id;\n  tentativasAnterior = original.tentativas || 0;\n} catch(e) {}\n\n// Evolution usa 'status', n8n usa 'statusCode' — checar ambos\nconst statusCode = item.json?.statusCode ?? item.json?.status ?? 200;\nconst temErro = !!item.json?.error ||\n                (typeof statusCode === 'number' && statusCode >= 400);\nconst sucesso = !temErro;\n\nconst erroMsg = temErro\n  ? String(item.json?.error?.message || item.json?.error || item.json?.message || 'HTTP ' + statusCode)\n  : null;\n\nreturn [{\n  json: {\n    despacho_id: despachoId,\n    status:      sucesso ? 'enviado' : 'falhou',\n    erro:        erroMsg,\n    tentativas:  tentativasAnterior + 1\n  }\n}];"
+        "jsCode": "const item = $input.first();\n\nlet entregaId = null;\nlet tentativasAnterior = 0;\ntry {\n  const original = $('Split Out — entregas').item.json;\n  entregaId = original.id;\n  tentativasAnterior = original.tentativas || 0;\n} catch(e) {}\n\n// Evolution usa 'status', n8n usa 'statusCode' — checar ambos\nconst statusCode = item.json?.statusCode ?? item.json?.status ?? 200;\nconst temErro = !!item.json?.error ||\n                (typeof statusCode === 'number' && statusCode >= 400);\nconst sucesso = !temErro;\n\nconst erroMsg = temErro\n  ? String(item.json?.error?.message || item.json?.error || item.json?.message || 'HTTP ' + statusCode)\n  : null;\n\nreturn [{\n  json: {\n    entrega_id: entregaId,\n    status:      sucesso ? 'enviado' : 'falhou',\n    erro:        erroMsg,\n    tentativas:  tentativasAnterior + 1\n  }\n}];"
       }
     },
 
     {
       "id": "if-tem-id",
-      "name": "IF — tem despacho_id?",
+      "name": "IF — tem entrega_id?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [2000, 280],
@@ -242,7 +242,7 @@
           "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
           "conditions": [{
             "id": "c1",
-            "leftValue": "={{ $json.despacho_id }}",
+            "leftValue": "={{ $json.entrega_id }}",
             "rightValue": 0,
             "operator": { "type": "number", "operation": "gt" }
           }],
@@ -254,13 +254,13 @@
 
     {
       "id": "patch-status",
-      "name": "PATCH — despachos status",
+      "name": "PATCH — entregas status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [2220, 200],
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $('Config').first().json.NEXUS_URL + '/despachos/' + $json.despacho_id + '/status' }}",
+        "url": "={{ $('Config').first().json.NEXUS_URL + '/entregas/' + $json.entrega_id + '/status' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -282,18 +282,18 @@
       "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
     },
     "Config": {
-      "main": [[{ "node": "GET — despachos/pendentes", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "GET — entregas/pendentes", "type": "main", "index": 0 }]]
     },
-    "GET — despachos/pendentes": {
-      "main": [[{ "node": "IF — tem despachos?", "type": "main", "index": 0 }]]
+    "GET — entregas/pendentes": {
+      "main": [[{ "node": "IF — tem entregas?", "type": "main", "index": 0 }]]
     },
-    "IF — tem despachos?": {
+    "IF — tem entregas?": {
       "main": [
-        [{ "node": "Split Out — despachos", "type": "main", "index": 0 }],
+        [{ "node": "Split Out — entregas", "type": "main", "index": 0 }],
         []
       ]
     },
-    "Split Out — despachos": {
+    "Split Out — entregas": {
       "main": [[{ "node": "IF — canal whatsapp?", "type": "main", "index": 0 }]]
     },
     "IF — canal whatsapp?": {
@@ -321,11 +321,11 @@
       "main": [[{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]]
     },
     "Code — avaliar resultado": {
-      "main": [[{ "node": "IF — tem despacho_id?", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "IF — tem entrega_id?", "type": "main", "index": 0 }]]
     },
-    "IF — tem despacho_id?": {
+    "IF — tem entrega_id?": {
       "main": [
-        [{ "node": "PATCH — despachos status", "type": "main", "index": 0 }],
+        [{ "node": "PATCH — entregas status", "type": "main", "index": 0 }],
         []
       ]
     }

@@ -1,6 +1,6 @@
 """
 Orquestrador de alertas.
-Junta filesystem (lógica) + banco (config/destinatários) + renderização + despachos.
+Junta filesystem (lógica) + banco (config/destinatários) + renderização + entregas.
 
 Fluxo:
   1. Buscar alerta no banco
@@ -10,7 +10,7 @@ Fluxo:
   5. Buscar destinatários fixos (alertas_destinatarios)
   6. Merge com destinatários dinâmicos do processador (grupos_por_destinatario)
   7. Para cada (item × destinatário × canal): checar rate limit, janela silêncio, renderizar
-  8. Inserir despachos no banco
+  8. Inserir entregas no banco
   9. Atualizar fingerprints + ultimo_disparo
  10. Registrar histórico
 """
@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import text
 
 from app.bd import engine
-from app.core.renderizador_mensagens import renderizar_despacho
+from app.core.renderizador_mensagens import renderizar_entrega
 from app.core.resolvedor_parametros import resolver_tokens
 
 logger = logging.getLogger(__name__)
@@ -194,7 +194,7 @@ def _rate_limit_excedido(dest: dict, alerta_id: int, canal: str) -> bool:
     with engine.connect() as c:
         if limite_hora:
             count_hora = c.execute(text("""
-                SELECT COUNT(*) FROM despachos
+                SELECT COUNT(*) FROM entregas
                 WHERE usuario_id = :uid AND alerta_id = :aid AND canal = :canal
                   AND criado_em > NOW() - INTERVAL '1 hour'
                   AND status != 'cancelado'
@@ -204,7 +204,7 @@ def _rate_limit_excedido(dest: dict, alerta_id: int, canal: str) -> bool:
 
         if limite_dia:
             count_dia = c.execute(text("""
-                SELECT COUNT(*) FROM despachos
+                SELECT COUNT(*) FROM entregas
                 WHERE usuario_id = :uid AND alerta_id = :aid AND canal = :canal
                   AND criado_em > NOW() - INTERVAL '24 hours'
                   AND status != 'cancelado'
@@ -322,7 +322,7 @@ def _merge_destinatarios_dinamicos(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Despachos
+# Entregas
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _destino_canal(dest: dict, canal: str) -> str | None:
@@ -333,7 +333,7 @@ def _destino_canal(dest: dict, canal: str) -> str | None:
     return None
 
 
-def _inserir_despacho(
+def _inserir_entrega(
     historico_id: int | None,
     alerta_id: int,
     dest: dict,
@@ -347,7 +347,7 @@ def _inserir_despacho(
 
     with engine.begin() as c:
         row = c.execute(text("""
-            INSERT INTO despachos
+            INSERT INTO entregas
                 (historico_id, alerta_id, usuario_id, canal, destino, payload, status, enviar_apos)
             VALUES
                 (:hid, :aid, :uid, :canal, :destino, :payload, :status, :enviar_apos)
@@ -369,7 +369,7 @@ def _inserir_despacho(
 # Histórico
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _registrar_historico(alerta: dict, resultado: dict, total_despachos: int) -> int | None:
+def _registrar_historico(alerta: dict, resultado: dict, total_entregas: int) -> int | None:
     try:
         with engine.begin() as c:
             row = c.execute(text("""
@@ -385,7 +385,7 @@ def _registrar_historico(alerta: dict, resultado: dict, total_despachos: int) ->
                 "rid":    alerta["id"],
                 "rnome":  alerta["nome"],
                 "params": json.dumps({"total_encontrado": resultado.get("total", 0),
-                                      "total_despachos": total_despachos}),
+                                      "total_entregas": total_entregas}),
                 "hash":   resultado.get("fingerprint"),
             }).scalar()
         return row
@@ -414,7 +414,7 @@ def orquestrar_alerta(
         forcar:             Se True, ignora cooldown e fingerprints já disparados.
 
     Returns:
-        Dict com deve_notificar, despachos criados e metadados de execução.
+        Dict com deve_notificar, entregas criadas e metadados de execução.
 
     Raises:
         AlertaNaoEncontrado: se o alerta não existir ou estiver inativo.
@@ -518,8 +518,8 @@ def orquestrar_alerta(
         "resumo":    resultado.get("resumo", ""),
     }
 
-    # 8. Montar e inserir despachos
-    despachos_criados: list[dict] = []
+    # 8. Montar e inserir entregas
+    entregas_criadas: list[dict] = []
     fps_disparados: list[str] = []
 
     # Registrar histórico antes para ter historico_id
@@ -535,7 +535,7 @@ def orquestrar_alerta(
                 continue
 
             if _rate_limit_excedido(dest, alerta["id"], canal):
-                despachos_criados.append({
+                entregas_criadas.append({
                     "status": "bloqueado_rate_limit",
                     "canal": canal,
                     "destino": destino,
@@ -546,27 +546,27 @@ def orquestrar_alerta(
             enviar_apos = _calcular_enviar_apos(dest)
 
             if modo == "agrupado":
-                # Um despacho com todos os itens a notificar
+                # Uma entrega com todos os itens a notificar
                 linhas = [l for l, _ in itens_a_notificar if l is not None]
                 ctx = {**contexto_base, "dados": linhas, "total": len(linhas)}
-                payload = renderizar_despacho(nome_alerta, canal, "agrupado", ctx)
+                payload = renderizar_entrega(nome_alerta, canal, "agrupado", ctx)
                 if payload:
-                    did = _inserir_despacho(historico_id, alerta["id"], dest, canal, payload, enviar_apos=enviar_apos)
-                    despachos_criados.append({
-                        "id": did, "status": "pendente" if not enviar_apos else "agendado",
+                    eid = _inserir_entrega(historico_id, alerta["id"], dest, canal, payload, enviar_apos=enviar_apos)
+                    entregas_criadas.append({
+                        "id": eid, "status": "pendente" if not enviar_apos else "agendado",
                         "canal": canal, "destino": destino,
                         "destinatario": dest.get("nome"),
                         "enviar_apos": enviar_apos.isoformat() if enviar_apos else None,
                     })
             else:
-                # individual: um despacho por item
+                # individual: uma entrega por item
                 for linha, fp in itens_a_notificar:
                     ctx_linha = linha or {}
-                    payload = renderizar_despacho(nome_alerta, canal, "individual", contexto_base, ctx_linha)
+                    payload = renderizar_entrega(nome_alerta, canal, "individual", contexto_base, ctx_linha)
                     if payload:
-                        did = _inserir_despacho(historico_id, alerta["id"], dest, canal, payload, enviar_apos=enviar_apos)
-                        despachos_criados.append({
-                            "id": did, "status": "pendente",
+                        eid = _inserir_entrega(historico_id, alerta["id"], dest, canal, payload, enviar_apos=enviar_apos)
+                        entregas_criadas.append({
+                            "id": eid, "status": "pendente",
                             "canal": canal, "destino": destino,
                             "destinatario": dest.get("nome"),
                             "enviar_apos": enviar_apos.isoformat() if enviar_apos else None,
@@ -582,8 +582,8 @@ def orquestrar_alerta(
     _atualizar_fingerprints(alerta["id"], list(set(fps_disparados)))
     _atualizar_ultimo_disparo_alerta(alerta["id"])
 
-    pendentes = [d for d in despachos_criados if d.get("status") == "pendente"]
-    bloqueados = [d for d in despachos_criados if d.get("status") == "bloqueado_rate_limit"]
+    pendentes = [d for d in entregas_criadas if d.get("status") == "pendente"]
+    bloqueados = [d for d in entregas_criadas if d.get("status") == "bloqueado_rate_limit"]
 
     return {
         "alerta": _info_alerta(alerta),
@@ -591,8 +591,8 @@ def orquestrar_alerta(
         "resumo": resultado.get("resumo", ""),
         "total_encontrado": len(dados),
         "itens_notificados": len(itens_a_notificar),
-        "despachos": pendentes,
-        "despachos_bloqueados_rate_limit": len(bloqueados),
+        "entregas": pendentes,
+        "entregas_bloqueadas_rate_limit": len(bloqueados),
         "historico_id": historico_id,
     }
 

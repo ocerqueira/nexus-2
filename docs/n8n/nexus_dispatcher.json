@@ -1,5 +1,5 @@
 {
-  "name": "Nexus — Agendamentos Trigger v4 (dispara recursos, despachos via sender)",
+  "name": "Nexus — Agendamentos Trigger v4 (dispara recursos, entregas via sender)",
   "nodes": [
     {
       "parameters": {
