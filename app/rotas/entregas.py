@@ -8,12 +8,32 @@ GET  /entregas              — Admin: listagem com filtros
 
 import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from app.bd import engine
+
+_UTC = ZoneInfo("UTC")
+_TZ_SP = ZoneInfo("America/Sao_Paulo")
+_CAMPOS_DT = ("enviar_apos", "enviado_em", "criado_em")
+
+
+def _para_iso_local(dt: datetime | None) -> str | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_UTC)
+    return dt.astimezone(_TZ_SP).isoformat()
+
+
+def _converter_dt(row: dict) -> dict:
+    for campo in _CAMPOS_DT:
+        if campo in row:
+            row[campo] = _para_iso_local(row[campo])
+    return row
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +94,7 @@ def listar_pendentes(
 
     return {
         "total": len(rows),
-        "entregas": [dict(r) for r in rows],
+        "entregas": [_converter_dt(dict(r)) for r in rows],
     }
 
 
@@ -114,7 +134,7 @@ def atualizar_status(
     if not existe:
         raise HTTPException(status_code=404, detail=f"Entrega {entrega_id} não encontrada")
 
-    agora = datetime.now()
+    agora = datetime.utcnow()
     campos = {"id": entrega_id, "status": body.status, "agora": agora}
     sets = ["status = :status"]
 
@@ -202,5 +222,5 @@ def listar_entregas(
         "total":    total,
         "pagina":   pagina,
         "por_pagina": por_pagina,
-        "entregas": [dict(r) for r in rows],
+        "entregas": [_converter_dt(dict(r)) for r in rows],
     }
