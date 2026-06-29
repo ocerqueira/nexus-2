@@ -6,7 +6,6 @@
     "nexus": "payload autossuficiente — sem re-fetch de PDF"
   },
   "nodes": [
-
     {
       "id": "schedule",
       "name": "Cron — a cada minuto",
@@ -30,16 +29,61 @@
         "mode": "manual",
         "assignments": {
           "assignments": [
-            { "id": "a1",  "name": "NEXUS_URL",         "value": "http://192.168.1.100:8099",    "type": "string" },
-            { "id": "a2",  "name": "NEXUS_API_KEY",      "value": "sua_chave_nexus",              "type": "string" },
-            { "id": "a3",  "name": "EVOLUTION_URL",      "value": "https://api.evolution.com",   "type": "string" },
-            { "id": "a4",  "name": "EVOLUTION_INSTANCE", "value": "minha_instancia",             "type": "string" },
-            { "id": "a5",  "name": "EVOLUTION_API_KEY",  "value": "sua_chave_evolution",         "type": "string" },
-            { "id": "a6",  "name": "SMTP_HOST",          "value": "smtp.gmail.com",              "type": "string" },
-            { "id": "a7",  "name": "SMTP_PORT",          "value": 587,                           "type": "number" },
-            { "id": "a8",  "name": "SMTP_USER",          "value": "seu-email@gmail.com",         "type": "string" },
-            { "id": "a9",  "name": "SMTP_PASSWORD",      "value": "xxxx xxxx xxxx xxxx",         "type": "string" },
-            { "id": "a10", "name": "SMTP_FROM_NAME",     "value": "Nexus",                       "type": "string" }
+            {
+              "id": "a1",
+              "name": "NEXUS_URL",
+              "value": "http://192.168.1.163:8099",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "NEXUS_API_KEY",
+              "value": "sua_chave_nexus",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "EVOLUTION_URL",
+              "value": "https://api.evolution.com",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "EVOLUTION_INSTANCE",
+              "value": "minha_instancia",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "EVOLUTION_API_KEY",
+              "value": "sua_chave_evolution",
+              "type": "string"
+            },
+            {
+              "id": "a6",
+              "name": "SMTP_HOST",
+              "value": "smtp.gmail.com",
+              "type": "string"
+            },
+            { "id": "a7", "name": "SMTP_PORT", "value": 587, "type": "number" },
+            {
+              "id": "a8",
+              "name": "SMTP_USER",
+              "value": "seu-email@gmail.com",
+              "type": "string"
+            },
+            {
+              "id": "a9",
+              "name": "SMTP_PASSWORD",
+              "value": "xxxx xxxx xxxx xxxx",
+              "type": "string"
+            },
+            {
+              "id": "a10",
+              "name": "SMTP_FROM_NAME",
+              "value": "Nexus",
+              "type": "string"
+            }
           ]
         },
         "options": {}
@@ -73,13 +117,19 @@
       "position": [660, 300],
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [{
-            "id": "c1",
-            "leftValue": "={{ $json.total }}",
-            "rightValue": 0,
-            "operator": { "type": "number", "operation": "gt" }
-          }],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.total }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
           "combinator": "and"
         },
         "options": {}
@@ -106,13 +156,19 @@
       "position": [1100, 300],
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [{
-            "id": "c1",
-            "leftValue": "={{ $json.canal }}",
-            "rightValue": "whatsapp",
-            "operator": { "type": "string", "operation": "equals" }
-          }],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.canal }}",
+              "rightValue": "whatsapp",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
           "combinator": "and"
         },
         "options": {}
@@ -127,13 +183,19 @@
       "position": [1320, 180],
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [{
-            "id": "c1",
-            "leftValue": "={{ $json.payload.tipo }}",
-            "rightValue": "pdf",
-            "operator": { "type": "string", "operation": "equals" }
-          }],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.payload.tipo }}",
+              "rightValue": "pdf",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
           "combinator": "and"
         },
         "options": {}
@@ -153,7 +215,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" }
+            {
+              "name": "apikey",
+              "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}"
+            }
           ]
         },
         "sendBody": true,
@@ -176,7 +241,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" }
+            {
+              "name": "apikey",
+              "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}"
+            }
           ]
         },
         "sendBody": true,
@@ -239,13 +307,19 @@
       "position": [2000, 280],
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
-          "conditions": [{
-            "id": "c1",
-            "leftValue": "={{ $json.entrega_id }}",
-            "rightValue": 0,
-            "operator": { "type": "number", "operation": "gt" }
-          }],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.entrega_id }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
           "combinator": "and"
         },
         "options": {}
@@ -264,7 +338,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key",    "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" },
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $('Config').first().json.NEXUS_API_KEY }}"
+            },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
@@ -274,7 +351,6 @@
         "options": {}
       }
     }
-
   ],
 
   "connections": {
@@ -282,7 +358,9 @@
       "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
     },
     "Config": {
-      "main": [[{ "node": "GET — entregas/pendentes", "type": "main", "index": 0 }]]
+      "main": [
+        [{ "node": "GET — entregas/pendentes", "type": "main", "index": 0 }]
+      ]
     },
     "GET — entregas/pendentes": {
       "main": [[{ "node": "IF — tem entregas?", "type": "main", "index": 0 }]]
@@ -305,20 +383,26 @@
     "IF — tipo pdf?": {
       "main": [
         [{ "node": "Evolution — sendMedia", "type": "main", "index": 0 }],
-        [{ "node": "Evolution — sendText",  "type": "main", "index": 0 }]
+        [{ "node": "Evolution — sendText", "type": "main", "index": 0 }]
       ]
     },
     "Evolution — sendMedia": {
-      "main": [[{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]]
+      "main": [
+        [{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]
+      ]
     },
     "Evolution — sendText": {
-      "main": [[{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]]
+      "main": [
+        [{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]
+      ]
     },
     "Code — preparar email": {
       "main": [[{ "node": "SMTP — enviar email", "type": "main", "index": 0 }]]
     },
     "SMTP — enviar email": {
-      "main": [[{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]]
+      "main": [
+        [{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]
+      ]
     },
     "Code — avaliar resultado": {
       "main": [[{ "node": "IF — tem entrega_id?", "type": "main", "index": 0 }]]

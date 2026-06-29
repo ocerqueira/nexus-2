@@ -6,6 +6,7 @@ CRUD + endpoints de consulta para o N8N.
 import json
 import logging
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -13,6 +14,8 @@ from sqlalchemy import text
 
 from app.bd import engine
 from app.core.calculadora_agenda import calcular_proximo_envio
+
+_UTC = ZoneInfo("UTC")
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +159,24 @@ def _linha_para_dict(linha) -> dict:
     return dict(linha)
 
 
+def _para_iso_local(dt: datetime | None, timezone_str: str) -> str | None:
+    """Converte datetime UTC (aware ou naive) para ISO string no fuso local."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_UTC)
+    return dt.astimezone(ZoneInfo(timezone_str)).isoformat()
+
+
+def _converter_datetimes_para_local(ag: dict) -> dict:
+    """Converte proximo_envio e ultimo_envio de UTC para o timezone do agendamento."""
+    tz_str = ag.get("timezone") or "America/Sao_Paulo"
+    for campo in ("proximo_envio", "ultimo_envio"):
+        if ag.get(campo) is not None:
+            ag[campo] = _para_iso_local(ag[campo], tz_str)
+    return ag
+
+
 def _validar_frequencia(dados: dict) -> None:
     """Valida constraints de frequência (semanal precisa de dia_semana, etc)."""
     if dados.get("frequencia") == "semanal" and not dados.get("dia_semana"):
@@ -233,6 +254,7 @@ def listar_proximas_execucoes() -> dict:
             continue
 
         if proximo <= agora:
+            tz_str = ag.get("timezone") or "America/Sao_Paulo"
             # Se atrasou mais de 60 min, recalcula e pula
             if proximo < tolerancia_60min:
                 logger.info(
@@ -250,21 +272,15 @@ def listar_proximas_execucoes() -> dict:
                             """),
                             {"proximo": novo_proximo, "id": ag["id"]},
                         )
-                    ag["proximo_envio"] = novo_proximo.isoformat()
+                    ag["proximo_envio"] = _para_iso_local(novo_proximo, tz_str)
                 except Exception as erro:
                     logger.error(
                         f"Erro ao recalcular agendamento {ag['id']}: {erro}"
                     )
                 continue
 
-            # Converte datetime para ISO string na resposta
-            ag["proximo_envio"] = proximo.isoformat()
-            if ag.get("ultimo_envio") and ag["ultimo_envio"].tzinfo is not None:
-                ag["ultimo_envio"] = ag["ultimo_envio"].replace(
-                    tzinfo=None
-                ).isoformat()
-            elif ag.get("ultimo_envio"):
-                ag["ultimo_envio"] = ag["ultimo_envio"].isoformat()
+            ag["proximo_envio"] = _para_iso_local(proximo, tz_str)
+            ag["ultimo_envio"] = _para_iso_local(ag.get("ultimo_envio"), tz_str)
 
             prontos.append(ag)
 
@@ -308,7 +324,7 @@ def listar_agendamentos(
 
     return {
         "total": len(resultado),
-        "agendamentos": [_linha_para_dict(linha) for linha in resultado],
+        "agendamentos": [_converter_datetimes_para_local(_linha_para_dict(linha)) for linha in resultado],
     }
 
 
@@ -392,7 +408,7 @@ def criar_agendamento(dados: CriarAgendamento) -> dict:
     return {
         "status": "criado",
         "id": novo_id,
-        "proximo_envio": proximo.isoformat(),
+        "proximo_envio": _para_iso_local(proximo, ag.get("timezone", "America/Sao_Paulo")),
     }
 
 
@@ -456,11 +472,12 @@ def marcar_executado(agendamento_id: int) -> dict:
         f"Próximo: {novo_proximo.isoformat()}"
     )
 
+    tz_str = ag.get("timezone", "America/Sao_Paulo")
     return {
         "status": "executado",
         "id": agendamento_id,
-        "ultimo_envio": agora.isoformat(),
-        "proximo_envio": novo_proximo.isoformat(),
+        "ultimo_envio": _para_iso_local(agora, tz_str),
+        "proximo_envio": _para_iso_local(novo_proximo, tz_str),
     }
 
 
@@ -563,7 +580,8 @@ def atualizar_agendamento(
 
     resposta = {"status": "atualizado", "id": agendamento_id}
     if "proximo_envio" in atualizacoes:
-        resposta["proximo_envio"] = atualizacoes["proximo_envio"].isoformat()
+        tz_str = atualizacoes.get("timezone") or ag_atual.get("timezone", "America/Sao_Paulo")
+        resposta["proximo_envio"] = _para_iso_local(atualizacoes["proximo_envio"], tz_str)
 
     return resposta
 
