@@ -10,4 +10,5 @@ engine: Engine = create_engine(
     pool_pre_ping=True,  # Valida conexão antes de usar
     pool_size=5,  # Conexões mantidas no pool
     max_overflow=10,  # Conexões extras se o pool esgotar
+    connect_args={"options": "-c timezone=UTC"},
 )
