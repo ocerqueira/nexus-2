@@ -13,8 +13,13 @@
 Execute no servidor (ou em qualquer máquina com Python 3):
 
 ```bash
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" 
 ```
+ou 
+
+````bash
+python3 -c "import base64; from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC; from cryptography.hazmat.primitives import hashes; kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=b'sal_fixo_de_teste', iterations=480000); print(base64.urlsafe_b64encode(kdf.derive(b'SuaPalavraAqui')).decode())"
+````
 
 Saída esperada (exemplo — a sua será diferente):
 
