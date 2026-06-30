@@ -26,11 +26,11 @@
         "mode": "manual",
         "assignments": {
           "assignments": [
-            { "id": "a1", "name": "NEXUS_URL",          "value": "http://10.81.234.130:8099",            "type": "string" },
-            { "id": "a2", "name": "NEXUS_API_KEY",       "value": "sua_chave_nexus",                     "type": "string" },
-            { "id": "a3", "name": "EVOLUTION_URL",       "value": "https://whats.local.noroeste.corp",   "type": "string" },
-            { "id": "a4", "name": "EVOLUTION_INSTANCE",  "value": "Lucas",                               "type": "string" },
-            { "id": "a5", "name": "EVOLUTION_API_KEY",   "value": "433FE547C642-4D64-AA5F-E4D53DD26B2F", "type": "string" }
+            { "id": "a1", "name": "NEXUS_URL",         "value": "http://10.81.234.130:8099",            "type": "string" },
+            { "id": "a2", "name": "NEXUS_API_KEY",      "value": "sua_chave_nexus",                     "type": "string" },
+            { "id": "a3", "name": "EVOLUTION_URL",      "value": "https://whats.local.noroeste.corp",   "type": "string" },
+            { "id": "a4", "name": "EVOLUTION_INSTANCE", "value": "Lucas",                               "type": "string" },
+            { "id": "a5", "name": "EVOLUTION_API_KEY",  "value": "433FE547C642-4D64-AA5F-E4D53DD26B2F", "type": "string" }
           ]
         },
         "options": {}
@@ -89,7 +89,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const sessao = $('GET — sessao').item.json;\nconst parsed = $('Code — parse mensagem').item.json;\nconst { numero, msg_type, list_id, texto } = parsed;\nconst etapa = sessao.etapa || 'idle';\nconst recurso_tipo = sessao.recurso_tipo || null;\nconst recurso_nome = sessao.recurso_nome || null;\nconst ps = sessao.parametros || {};\n\nconst toISO = d => d.toISOString().split('T')[0];\nconst hoje = new Date();\nconst ano = hoje.getFullYear();\nconst mes = hoje.getMonth();\n\nfunction calcPeriodo(id) {\n  switch(id) {\n    case 'p_este_mes': return {data_inicio:toISO(new Date(ano,mes,1)),data_fim:toISO(new Date(ano,mes+1,0))};\n    case 'p_mes_passado': return {data_inicio:toISO(new Date(ano,mes-1,1)),data_fim:toISO(new Date(ano,mes,0))};\n    case 'p_30dias': return {data_inicio:toISO(new Date(hoje-30*864e5)),data_fim:toISO(hoje)};\n    case 'p_90dias': return {data_inicio:toISO(new Date(hoje-90*864e5)),data_fim:toISO(hoje)};\n    default: return null;\n  }\n}\n\nfunction parseData(s) {\n  let m = s.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);\n  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;\n  m = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);\n  return m ? s : null;\n}\n\nlet action = 'send_menu';\nlet txt = '';\nlet call_nome = null;\nlet call_params = {};\nlet ns = {etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n\nconst quer_menu = (etapa==='idle'||texto.toLowerCase()==='menu'||texto==='0') && msg_type==='text';\n\nif (quer_menu || etapa==='idle') {\n  action='send_menu';\n  ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n}\nelse if (etapa==='aguardando_menu' && msg_type==='list') {\n  if (list_id==='ajuda') {\n    action='send_texto';\n    txt='*Nexus — Como usar*\\n\\n📊 *Relatórios disponíveis:*\\n• Pedidos por Vendedor — ranking de vendedores com ticket médio e top 5 produtos\\n\\n🚨 *Alertas disponíveis:*\\n• Comprimento Excedente — itens de telha/SBX acima do limite\\n\\nDigite *menu* a qualquer momento para voltar ao início.';\n    ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n  } else if (list_id?.startsWith('rel_')) {\n    action='send_periodo';\n    ns={etapa:'aguardando_periodo',recurso_tipo:'relatorio',recurso_nome:list_id.slice(4),parametros:{cod_empresa:1}};\n  } else if (list_id?.startsWith('alerta_')) {\n    action='call_alerta';\n    call_nome=list_id.slice(7);\n    call_params={cod_empresa:1};\n    ns={etapa:'idle',recurso_tipo:null,recurso_nome:null,parametros:{}};\n  } else {\n    action='send_menu';\n    ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n  }\n}\nelse if (etapa==='aguardando_periodo' && msg_type==='list') {\n  if (list_id==='p_custom') {\n    action='send_texto';\n    txt='📅 *Data de início:*\\nDigite no formato DD/MM/YYYY\\nEx: 01/01/2026';\n    ns={etapa:'aguardando_data_inicio',recurso_tipo,recurso_nome,parametros:ps};\n  } else {\n    const p = calcPeriodo(list_id);\n    if (p) {\n      action='call_relatorio';\n      call_nome=recurso_nome;\n      call_params={...ps,...p};\n      ns={etapa:'idle',recurso_tipo:null,recurso_nome:null,parametros:{}};\n    } else {\n      action='send_periodo';\n      ns=sessao;\n    }\n  }\n}\nelse if (etapa==='aguardando_data_inicio' && msg_type==='text') {\n  const d = parseData(texto.trim());\n  if (!d) {\n    action='send_texto';\n    txt='❌ Formato inválido. Use DD/MM/YYYY\\nEx: 01/01/2026';\n    ns=sessao;\n  } else {\n    action='send_texto';\n    txt='📅 *Data de fim:*\\nDigite no formato DD/MM/YYYY\\nEx: 28/02/2026';\n    ns={etapa:'aguardando_data_fim',recurso_tipo,recurso_nome,parametros:{...ps,data_inicio:d}};\n  }\n}\nelse if (etapa==='aguardando_data_fim' && msg_type==='text') {\n  const d = parseData(texto.trim());\n  if (!d) {\n    action='send_texto';\n    txt='❌ Formato inválido. Use DD/MM/YYYY\\nEx: 28/02/2026';\n    ns=sessao;\n  } else {\n    action='call_relatorio';\n    call_nome=recurso_nome;\n    call_params={...ps,data_fim:d};\n    ns={etapa:'idle',recurso_tipo:null,recurso_nome:null,parametros:{}};\n  }\n}\nelse {\n  action='send_menu';\n  ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n}\n\nreturn [{\n  numero,\n  next_action: action,\n  mensagem_texto: txt,\n  recurso_nome: call_nome,\n  recurso_nome_sessao: recurso_nome,\n  parametros: call_params,\n  novo_estado: ns\n}];"
+        "jsCode": "const sessao = $('GET — sessao').item.json;\nconst parsed = $('Code — parse mensagem').item.json;\nconst { numero, msg_type, list_id, texto } = parsed;\nconst etapa = sessao.etapa || 'idle';\nconst recurso_tipo = sessao.recurso_tipo || null;\nconst recurso_nome = sessao.recurso_nome || null;\nconst ps = sessao.parametros || {};\n\nconst toISO = d => d.toISOString().split('T')[0];\nconst hoje = new Date();\nconst ano = hoje.getFullYear();\nconst mes = hoje.getMonth();\n\nfunction calcPeriodo(id) {\n  switch(id) {\n    case 'p_este_mes': return {data_inicio:toISO(new Date(ano,mes,1)),data_fim:toISO(new Date(ano,mes+1,0))};\n    case 'p_mes_passado': return {data_inicio:toISO(new Date(ano,mes-1,1)),data_fim:toISO(new Date(ano,mes,0))};\n    case 'p_30dias': return {data_inicio:toISO(new Date(hoje-30*864e5)),data_fim:toISO(hoje)};\n    case 'p_90dias': return {data_inicio:toISO(new Date(hoje-90*864e5)),data_fim:toISO(hoje)};\n    default: return null;\n  }\n}\n\nfunction parseData(s) {\n  let m = s.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);\n  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;\n  m = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);\n  return m ? s : null;\n}\n\nlet action = 'send_menu';\nlet txt = '';\nlet call_nome = null;\nlet call_params = {};\nlet ns = {etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n\nconst quer_menu = (etapa==='idle'||texto.toLowerCase()==='menu'||texto==='0') && msg_type==='text';\n\nif (quer_menu || etapa==='idle') {\n  action='send_menu';\n  ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n}\nelse if (etapa==='aguardando_menu' && msg_type==='list') {\n  if (list_id==='ajuda') {\n    action='send_texto';\n    txt='*Nexus — Como usar*\\n\\n📊 *Relatórios disponíveis:*\\n• Pedidos por Vendedor — ranking de vendedores com ticket médio e top 5 produtos\\n\\nDigite *menu* a qualquer momento para voltar ao início.';\n    ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n  } else if (list_id?.startsWith('rel_')) {\n    action='send_periodo';\n    ns={etapa:'aguardando_periodo',recurso_tipo:'relatorio',recurso_nome:list_id.slice(4),parametros:{cod_empresa:1}};\n  } else {\n    action='send_menu';\n    ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n  }\n}\nelse if (etapa==='aguardando_periodo' && msg_type==='list') {\n  if (list_id==='p_custom') {\n    action='send_texto';\n    txt='📅 *Data de início:*\\nDigite no formato DD/MM/YYYY\\nEx: 01/01/2026';\n    ns={etapa:'aguardando_data_inicio',recurso_tipo,recurso_nome,parametros:ps};\n  } else {\n    const p = calcPeriodo(list_id);\n    if (p) {\n      action='call_relatorio';\n      call_nome=recurso_nome;\n      call_params={...ps,...p};\n      ns={etapa:'idle',recurso_tipo:null,recurso_nome:null,parametros:{}};\n    } else {\n      action='send_periodo';\n      ns=sessao;\n    }\n  }\n}\nelse if (etapa==='aguardando_data_inicio' && msg_type==='text') {\n  const d = parseData(texto.trim());\n  if (!d) {\n    action='send_texto';\n    txt='❌ Formato inválido. Use DD/MM/YYYY\\nEx: 01/01/2026';\n    ns=sessao;\n  } else {\n    action='send_texto';\n    txt='📅 *Data de fim:*\\nDigite no formato DD/MM/YYYY\\nEx: 28/02/2026';\n    ns={etapa:'aguardando_data_fim',recurso_tipo,recurso_nome,parametros:{...ps,data_inicio:d}};\n  }\n}\nelse if (etapa==='aguardando_data_fim' && msg_type==='text') {\n  const d = parseData(texto.trim());\n  if (!d) {\n    action='send_texto';\n    txt='❌ Formato inválido. Use DD/MM/YYYY\\nEx: 28/02/2026';\n    ns=sessao;\n  } else {\n    action='call_relatorio';\n    call_nome=recurso_nome;\n    call_params={...ps,data_fim:d};\n    ns={etapa:'idle',recurso_tipo:null,recurso_nome:null,parametros:{}};\n  }\n}\nelse {\n  action='send_menu';\n  ns={etapa:'aguardando_menu',recurso_tipo:null,recurso_nome:null,parametros:{}};\n}\n\nreturn [{\n  numero,\n  next_action: action,\n  mensagem_texto: txt,\n  recurso_nome: call_nome,\n  recurso_nome_sessao: recurso_nome,\n  parametros: call_params,\n  novo_estado: ns\n}];"
       },
       "id": "compute",
       "name": "Code — state machine",
@@ -135,8 +135,7 @@
             { "value2": "send_menu" },
             { "value2": "send_periodo" },
             { "value2": "send_texto" },
-            { "value2": "call_relatorio" },
-            { "value2": "call_alerta" }
+            { "value2": "call_relatorio" }
           ]
         },
         "fallbackOutput": "none"
@@ -149,7 +148,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $json;\nreturn [{\n  number: item.numero,\n  title: 'Nexus — Sistema ERP',\n  description: 'Selecione um relatório ou alerta',\n  buttonText: 'Ver opções',\n  footerText: 'Nexus',\n  sections: [\n    { title: '📊 Relatórios', rows: [\n      { rowId: 'rel_pedidos_por_vendedor', title: 'Pedidos por Vendedor', description: 'Ranking com ticket médio e top 5 produtos' }\n    ]},\n    { title: '🚨 Alertas', rows: [\n      { rowId: 'alerta_item_comprimento_excedente', title: 'Comprimento Excedente', description: 'Itens de telha/SBX acima do limite' }\n    ]},\n    { title: '❓ Suporte', rows: [\n      { rowId: 'ajuda', title: 'Ajuda', description: 'Como usar o Nexus' }\n    ]}\n  ]\n}];"
+        "jsCode": "const item = $json;\nreturn [{\n  number: item.numero,\n  title: 'Nexus — Sistema ERP',\n  description: 'Selecione um relatório',\n  buttonText: 'Ver opções',\n  footerText: 'Nexus',\n  sections: [\n    { title: '📊 Relatórios', rows: [\n      { rowId: 'rel_pedidos_por_vendedor', title: 'Pedidos por Vendedor', description: 'Ranking com ticket médio e top 5 produtos' }\n    ]},\n    { title: '❓ Suporte', rows: [\n      { rowId: 'ajuda', title: 'Ajuda', description: 'Como usar o Nexus' }\n    ]}\n  ]\n}];"
       },
       "id": "build-menu",
       "name": "Code — build menu principal",
@@ -277,55 +276,6 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [2680, 640]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $('Config').first().json.NEXUS_URL }}/alertas/{{ $json.recurso_nome }}/verificar?notificar=false",
-        "sendHeaders": true,
-        "headerParameters": { "parameters": [
-          { "name": "X-Api-Key", "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" }
-        ]},
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={ \"parametros\": {{ JSON.stringify($json.parametros) }} }",
-        "options": {}
-      },
-      "id": "call-alerta",
-      "name": "POST — verificar alerta",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2240, 780]
-    },
-    {
-      "parameters": {
-        "jsCode": "const payload = $input.first().json;\nconst numero = $('Code — state machine').item.json.numero;\nif (payload.deve_notificar) {\n  const al = payload.alerta || {};\n  const total = payload.total_encontrado || payload.itens_notificados || 0;\n  const msg = `🚨 *${al.titulo||'Alerta'}*\\n\\n${payload.resumo||''}\\n\\n_${total} item(s) encontrado(s)_`;\n  return [{numero, mensagem: msg}];\n} else {\n  const motivos = {\n    sem_dados: '✅ Nenhum item encontrado.',\n    em_cooldown: `⏳ Alerta em cooldown — ${payload.tempo_restante_min||0} min restantes.`,\n    todos_itens_em_cooldown: '✅ Sem novidades desde o último disparo.',\n    parametros_invalidos: `❌ Parâmetros inválidos: ${payload.erro||''}`\n  };\n  return [{numero, mensagem: motivos[payload.motivo] || '✅ Sem ocorrências no momento.'}];\n}"
-      },
-      "id": "preparar-alerta-resp",
-      "name": "Code — preparar resposta alerta",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [2460, 780]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $('Config').first().json.EVOLUTION_URL }}/message/sendText/{{ $('Config').first().json.EVOLUTION_INSTANCE }}",
-        "sendHeaders": true,
-        "headerParameters": { "parameters": [
-          { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" },
-          { "name": "Content-Type", "value": "application/json" }
-        ]},
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"number\": \"{{ $json.numero }}\",\n  \"text\": {{ JSON.stringify($json.mensagem) }}\n}",
-        "options": { "ignore400": true }
-      },
-      "id": "enviar-alerta-resp",
-      "name": "Evolution — sendText alerta",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2680, 780]
     }
   ],
   "connections": {
@@ -359,10 +309,9 @@
     "Switch — next_action": {
       "main": [
         [{ "node": "Code — build menu principal", "type": "main", "index": 0 }],
-        [{ "node": "Code — build menu período", "type": "main", "index": 0 }],
-        [{ "node": "Evolution — sendText", "type": "main", "index": 0 }],
-        [{ "node": "POST — solicitar relatório PDF", "type": "main", "index": 0 }],
-        [{ "node": "POST — verificar alerta", "type": "main", "index": 0 }]
+        [{ "node": "Code — build menu período",   "type": "main", "index": 0 }],
+        [{ "node": "Evolution — sendText",         "type": "main", "index": 0 }],
+        [{ "node": "POST — solicitar relatório PDF", "type": "main", "index": 0 }]
       ]
     },
     "Code — build menu principal": {
@@ -376,19 +325,13 @@
     },
     "Code — preparar PDF": {
       "main": [[{ "node": "Evolution — sendMedia PDF", "type": "main", "index": 0 }]]
-    },
-    "POST — verificar alerta": {
-      "main": [[{ "node": "Code — preparar resposta alerta", "type": "main", "index": 0 }]]
-    },
-    "Code — preparar resposta alerta": {
-      "main": [[{ "node": "Evolution — sendText alerta", "type": "main", "index": 0 }]]
     }
   },
   "active": false,
   "settings": { "executionOrder": "v1" },
   "tags": [{ "name": "nexus" }, { "name": "chatbot" }],
   "meta": {
-    "description": "Chatbot WhatsApp com navegação por menus (Evolution sendList). Estado persistido no banco Nexus (chatbot_sessoes). Fluxo: menu principal → seleção de período → gera relatório PDF ou verifica alerta.",
+    "description": "Chatbot WhatsApp para solicitar relatórios sob demanda via menu (Evolution sendList). Estado persistido no banco Nexus (chatbot_sessoes). Fluxo: menu principal → seleção de período → gera e envia PDF.",
     "templateCredsSetupCompleted": false
   }
 }
