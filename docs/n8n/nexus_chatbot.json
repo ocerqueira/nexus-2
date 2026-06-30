@@ -281,7 +281,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('Config').first().json.NEXUS_URL }}/alertas/{{ $json.recurso_nome }}/verificar",
+        "url": "={{ $('Config').first().json.NEXUS_URL }}/alertas/{{ $json.recurso_nome }}/verificar?notificar=false",
         "sendHeaders": true,
         "headerParameters": { "parameters": [
           { "name": "X-Api-Key", "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" }
@@ -299,7 +299,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const payload = $input.first().json;\nconst numero = $('Code — state machine').item.json.numero;\nif (payload.deve_notificar) {\n  const al = payload.alerta || {};\n  const consolidado = payload.mensagens_consolidadas?.whatsapp || '';\n  const msg = `🚨 *${al.titulo||'Alerta'}*\\n\\n${payload.resumo||''}` + (consolidado ? `\\n\\n${consolidado}` : '');\n  return [{numero, mensagem: msg}];\n} else {\n  const motivos = {\n    sem_dados: '✅ Nenhum item encontrado no período.',\n    em_cooldown: `⏳ Alerta em cooldown — ${payload.tempo_restante_min||0} min restantes.`,\n    dados_sem_alteracao: '✅ Sem novidades desde o último disparo.'\n  };\n  return [{numero, mensagem: motivos[payload.motivo] || `Alerta: ${payload.motivo||'sem resultado'}`}];\n}"
+        "jsCode": "const payload = $input.first().json;\nconst numero = $('Code — state machine').item.json.numero;\nif (payload.deve_notificar) {\n  const al = payload.alerta || {};\n  const total = payload.total_encontrado || payload.itens_notificados || 0;\n  const msg = `🚨 *${al.titulo||'Alerta'}*\\n\\n${payload.resumo||''}\\n\\n_${total} item(s) encontrado(s)_`;\n  return [{numero, mensagem: msg}];\n} else {\n  const motivos = {\n    sem_dados: '✅ Nenhum item encontrado.',\n    em_cooldown: `⏳ Alerta em cooldown — ${payload.tempo_restante_min||0} min restantes.`,\n    todos_itens_em_cooldown: '✅ Sem novidades desde o último disparo.',\n    parametros_invalidos: `❌ Parâmetros inválidos: ${payload.erro||''}`\n  };\n  return [{numero, mensagem: motivos[payload.motivo] || '✅ Sem ocorrências no momento.'}];\n}"
       },
       "id": "preparar-alerta-resp",
       "name": "Code — preparar resposta alerta",

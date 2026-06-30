@@ -56,6 +56,7 @@ def verificar_alerta(
     nome_alerta: str = Path(description="Nome técnico do alerta (ex: 'conexoes_inativas', 'item_comprimento_excedente')"),
     requisicao: RequisicaoAlerta | None = None,
     forcar: bool = Query(False, description="Se True, ignora cooldown e deduplicação por fingerprint"),
+    notificar: bool = Query(True, description="Se False, executa verificação mas não cria entregas nem atualiza cooldowns (uso: chatbot)"),
 ) -> dict:
     """
     Verifica um alerta e retorna payload completo para notificação.
@@ -63,6 +64,7 @@ def verificar_alerta(
     O payload inclui destinatários resolvidos, mensagens renderizadas
     (consolidadas e individuais) e metadados para o N8N decidir se deve notificar.
     Quando `forcar=true`, ignora cooldown e deduplicação — útil para testes manuais.
+    Quando `notificar=false`, retorna resultado sem criar entregas (uso: chatbot interativo).
     """
     # 1. Carregar processador dinamicamente
     processador_classe = _carregar_alerta(nome_alerta)
@@ -75,7 +77,7 @@ def verificar_alerta(
     # Extrair parâmetros e resolver tokens dinâmicos ({{mes_anterior_inicio}}, etc.)
     parametros = resolver_tokens(requisicao.parametros if requisicao else {})
     logger.info(
-        f"Verificando alerta '{nome_alerta}' (forçar={forcar}) params={parametros}"
+        f"Verificando alerta '{nome_alerta}' (forçar={forcar}, notificar={notificar}) params={parametros}"
     )
 
     # 2. Delegar para o orquestrador
@@ -85,6 +87,7 @@ def verificar_alerta(
             parametros=parametros,
             processador_classe=processador_classe,
             forcar=forcar,
+            notificar=notificar,
         )
     except AlertaNaoEncontrado as erro:
         raise HTTPException(status_code=404, detail=str(erro))

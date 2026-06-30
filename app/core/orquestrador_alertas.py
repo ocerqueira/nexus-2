@@ -403,6 +403,7 @@ def orquestrar_alerta(
     parametros: dict,
     processador_classe: type,
     forcar: bool = False,
+    notificar: bool = True,
 ) -> dict[str, Any]:
     """
     Ponto de entrada principal para disparo de alertas.
@@ -518,76 +519,74 @@ def orquestrar_alerta(
         "resumo":    resultado.get("resumo", ""),
     }
 
-    # 8. Montar e inserir entregas
+    # 8. Montar e inserir entregas (apenas se notificar=True)
     entregas_criadas: list[dict] = []
     fps_disparados: list[str] = []
+    historico_id = None
 
-    # Registrar histórico antes para ter historico_id
-    historico_id = _registrar_historico(alerta, resultado, 0)
+    if notificar:
+        historico_id = _registrar_historico(alerta, resultado, 0)
 
-    for dest in todos_dests:
-        modo = dest.get("modo_mensagem", "individual")
-        canais = dest.get("canais") or ["whatsapp"]
+        for dest in todos_dests:
+            modo = dest.get("modo_mensagem", "individual")
+            canais = dest.get("canais") or ["whatsapp"]
 
-        for canal in canais:
-            destino = _destino_canal(dest, canal)
-            if not destino:
-                continue
+            for canal in canais:
+                destino = _destino_canal(dest, canal)
+                if not destino:
+                    continue
 
-            if _rate_limit_excedido(dest, alerta["id"], canal):
-                entregas_criadas.append({
-                    "status": "bloqueado_rate_limit",
-                    "canal": canal,
-                    "destino": destino,
-                    "destinatario": dest.get("nome"),
-                })
-                continue
-
-            enviar_apos = _calcular_enviar_apos(dest)
-
-            if modo == "agrupado":
-                # Uma entrega com todos os itens a notificar
-                linhas = [l for l, _ in itens_a_notificar if l is not None]
-                ctx = {**contexto_base, "dados": linhas, "total": len(linhas)}
-                payload = renderizar_entrega(nome_alerta, canal, "agrupado", ctx)
-                if payload:
-                    eid = _inserir_entrega(historico_id, alerta["id"], dest, canal, payload, enviar_apos=enviar_apos)
+                if _rate_limit_excedido(dest, alerta["id"], canal):
                     entregas_criadas.append({
-                        "id": eid, "status": "pendente" if not enviar_apos else "agendado",
-                        "canal": canal, "destino": destino,
+                        "status": "bloqueado_rate_limit",
+                        "canal": canal,
+                        "destino": destino,
                         "destinatario": dest.get("nome"),
-                        "enviar_apos": enviar_apos.isoformat() if enviar_apos else None,
                     })
-            else:
-                # individual: uma entrega por item
-                for linha, fp in itens_a_notificar:
-                    ctx_linha = linha or {}
-                    payload = renderizar_entrega(nome_alerta, canal, "individual", contexto_base, ctx_linha)
+                    continue
+
+                enviar_apos = _calcular_enviar_apos(dest)
+
+                if modo == "agrupado":
+                    linhas = [l for l, _ in itens_a_notificar if l is not None]
+                    ctx = {**contexto_base, "dados": linhas, "total": len(linhas)}
+                    payload = renderizar_entrega(nome_alerta, canal, "agrupado", ctx)
                     if payload:
                         eid = _inserir_entrega(historico_id, alerta["id"], dest, canal, payload, enviar_apos=enviar_apos)
                         entregas_criadas.append({
-                            "id": eid, "status": "pendente",
+                            "id": eid, "status": "pendente" if not enviar_apos else "agendado",
                             "canal": canal, "destino": destino,
                             "destinatario": dest.get("nome"),
                             "enviar_apos": enviar_apos.isoformat() if enviar_apos else None,
                         })
-                        if fp not in fps_disparados:
-                            fps_disparados.append(fp)
+                else:
+                    for linha, fp in itens_a_notificar:
+                        ctx_linha = linha or {}
+                        payload = renderizar_entrega(nome_alerta, canal, "individual", contexto_base, ctx_linha)
+                        if payload:
+                            eid = _inserir_entrega(historico_id, alerta["id"], dest, canal, payload, enviar_apos=enviar_apos)
+                            entregas_criadas.append({
+                                "id": eid, "status": "pendente",
+                                "canal": canal, "destino": destino,
+                                "destinatario": dest.get("nome"),
+                                "enviar_apos": enviar_apos.isoformat() if enviar_apos else None,
+                            })
+                            if fp not in fps_disparados:
+                                fps_disparados.append(fp)
 
-    # Para modo agrupado, registrar todos os fps
-    if any(d.get("modo_mensagem") == "agrupado" for d in todos_dests):
-        fps_disparados = [fp for _, fp in itens_a_notificar]
+        if any(d.get("modo_mensagem") == "agrupado" for d in todos_dests):
+            fps_disparados = [fp for _, fp in itens_a_notificar]
 
-    # 9. Atualizar fingerprints + ultimo_disparo
-    _atualizar_fingerprints(alerta["id"], list(set(fps_disparados)))
-    _atualizar_ultimo_disparo_alerta(alerta["id"])
+        # 9. Atualizar fingerprints + ultimo_disparo (só quando notifica de verdade)
+        _atualizar_fingerprints(alerta["id"], list(set(fps_disparados)))
+        _atualizar_ultimo_disparo_alerta(alerta["id"])
 
     pendentes = [d for d in entregas_criadas if d.get("status") == "pendente"]
     bloqueados = [d for d in entregas_criadas if d.get("status") == "bloqueado_rate_limit"]
 
     return {
         "alerta": _info_alerta(alerta),
-        "deve_notificar": bool(pendentes),
+        "deve_notificar": bool(itens_a_notificar),
         "resumo": resultado.get("resumo", ""),
         "total_encontrado": len(dados),
         "itens_notificados": len(itens_a_notificar),
