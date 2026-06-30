@@ -18,15 +18,8 @@
         "mode": "manual",
         "assignments": {
           "assignments": [
-            { "id": "a1", "name": "NEXUS_URL",           "value": "http://192.168.1.100:8000", "type": "string" },
-            { "id": "a2", "name": "NEXUS_API_KEY",        "value": "sua_chave_nexus",           "type": "string" },
-            { "id": "a3", "name": "EVOLUTION_URL",        "value": "https://api.sua-evolution.com", "type": "string" },
-            { "id": "a4", "name": "EVOLUTION_INSTANCE",   "value": "minha_instancia",           "type": "string" },
-            { "id": "a5", "name": "EVOLUTION_API_KEY",    "value": "sua_chave_aqui",            "type": "string" },
-            { "id": "a6", "name": "SMTP_HOST",            "value": "smtp.gmail.com",            "type": "string" },
-            { "id": "a7", "name": "SMTP_PORT",            "value": 587,                         "type": "number" },
-            { "id": "a8", "name": "SMTP_USER",            "value": "seu-email@gmail.com",       "type": "string" },
-            { "id": "a9", "name": "SMTP_PASSWORD",        "value": "xxxx xxxx xxxx xxxx",       "type": "string" }
+            { "id": "a1", "name": "NEXUS_URL",        "value": "http://192.168.1.100:8000", "type": "string" },
+            { "id": "a2", "name": "NEXUS_API_KEY",    "value": "sua_chave_nexus",           "type": "string" }
           ]
         },
         "options": {}
@@ -129,94 +122,6 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true },
-          "conditions": [
-            {
-              "id": "cond-notif",
-              "leftValue": "={{ $json.deve_notificar }}",
-              "rightValue": true,
-              "operator": { "type": "boolean", "operation": "true" }
-            }
-          ]
-        }
-      },
-      "id": "if-notificar",
-      "name": "IF — deve_notificar?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [1750, 100]
-    },
-    {
-      "parameters": {
-        "jsCode": "const resp = $input.first().json;\nconst ag = $('Split Out — agendamentos').item.json;\nconst dests = resp.destinatarios || [];\nconst cons = resp.mensagens_consolidadas || {};\nconst grupos = resp.grupos_individuais || [];\nconst titulo = (resp.alerta || {}).titulo || 'Alerta';\n\nconst resultados = [];\n\nif (grupos.length > 0) {\n  for (const dest of dests) {\n    const canais = dest.canais && dest.canais.length > 0 ? dest.canais : ['whatsapp'];\n    for (const canal of canais) {\n      for (const grupo of grupos) {\n        const msgs = grupo.mensagens || {};\n        resultados.push({\n          json: {\n            agendamento_id: ag.id,\n            nome: dest.nome,\n            whatsapp: dest.whatsapp,\n            email: dest.email,\n            canal: canal,\n            mensagem_whatsapp: msgs.whatsapp || cons.whatsapp || '',\n            mensagem_email_assunto: msgs.email_assunto || cons.email_assunto || '',\n            mensagem_email_html: msgs.email_html || cons.email_html || '',\n            titulo: titulo\n          }\n        });\n      }\n    }\n  }\n} else {\n  for (const dest of dests) {\n    const canais = dest.canais && dest.canais.length > 0 ? dest.canais : ['whatsapp'];\n    for (const canal of canais) {\n      resultados.push({\n        json: {\n          agendamento_id: ag.id,\n          nome: dest.nome,\n          whatsapp: dest.whatsapp,\n          email: dest.email,\n          canal: canal,\n          mensagem_whatsapp: cons.whatsapp || resp.resumo || '',\n          mensagem_email_assunto: cons.email_assunto || ('Alerta: ' + titulo),\n          mensagem_email_html: cons.email_html || ('<p>' + (resp.resumo || 'Alerta Nexus') + '</p>'),\n          titulo: titulo\n        }\n      });\n    }\n  }\n}\n\nreturn resultados;"
-      },
-      "id": "code-dest",
-      "name": "Code — montar destinatarios",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [2000, 60]
-    },
-    {
-      "parameters": {
-        "rules": {
-          "values": [
-            { "value": "whatsapp", "output": 0 },
-            { "value": "email",    "output": 1 }
-          ]
-        },
-        "dataType": "string",
-        "value1": "={{ $json.canal }}"
-      },
-      "id": "switch-canal",
-      "name": "Switch — canal",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.2,
-      "position": [2250, 60]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $('Config').first().json.EVOLUTION_URL + '/message/sendText/' + $('Config').first().json.EVOLUTION_INSTANCE }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{ $('Config').first().json.EVOLUTION_API_KEY }}" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $json.whatsapp, text: $json.mensagem_whatsapp }) }}",
-        "options": {}
-      },
-      "id": "evo-sendtext",
-      "name": "Evolution — sendText",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2500, -40]
-    },
-    {
-      "parameters": {
-        "fromEmail": "={{ $('Config').first().json.SMTP_USER }}",
-        "toEmail": "={{ $json.email }}",
-        "subject": "={{ $json.mensagem_email_assunto }}",
-        "html": "={{ $json.mensagem_email_html }}",
-        "options": {
-          "host":     "={{ $('Config').first().json.SMTP_HOST }}",
-          "port":     "={{ $('Config').first().json.SMTP_PORT }}",
-          "user":     "={{ $('Config').first().json.SMTP_USER }}",
-          "password": "={{ $('Config').first().json.SMTP_PASSWORD }}",
-          "ssl": false
-        }
-      },
-      "id": "smtp-email",
-      "name": "SMTP — enviar email alerta",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 1,
-      "position": [2500, 160]
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "={{ $('Config').first().json.NEXUS_URL + '/relatorios/' + $json.recurso_nome + '/solicitar' }}",
         "sendHeaders": true,
@@ -260,7 +165,7 @@
       "name": "POST — marcar-executado",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2750, 300]
+      "position": [1750, 300]
     }
   ],
   "connections": {
@@ -284,32 +189,11 @@
     },
     "Switch — tipo_recurso": {
       "main": [
-        [{ "node": "POST — verificar alerta",     "type": "main", "index": 0 }],
-        [{ "node": "POST — solicitar relatorio",   "type": "main", "index": 0 }]
+        [{ "node": "POST — verificar alerta",   "type": "main", "index": 0 }],
+        [{ "node": "POST — solicitar relatorio", "type": "main", "index": 0 }]
       ]
     },
     "POST — verificar alerta": {
-      "main": [[{ "node": "IF — deve_notificar?", "type": "main", "index": 0 }]]
-    },
-    "IF — deve_notificar?": {
-      "main": [
-        [{ "node": "Code — montar destinatarios", "type": "main", "index": 0 }],
-        [{ "node": "POST — marcar-executado",     "type": "main", "index": 0 }]
-      ]
-    },
-    "Code — montar destinatarios": {
-      "main": [[{ "node": "Switch — canal", "type": "main", "index": 0 }]]
-    },
-    "Switch — canal": {
-      "main": [
-        [{ "node": "Evolution — sendText",        "type": "main", "index": 0 }],
-        [{ "node": "SMTP — enviar email alerta",  "type": "main", "index": 0 }]
-      ]
-    },
-    "Evolution — sendText": {
-      "main": [[{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]]
-    },
-    "SMTP — enviar email alerta": {
       "main": [[{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]]
     },
     "POST — solicitar relatorio": {
