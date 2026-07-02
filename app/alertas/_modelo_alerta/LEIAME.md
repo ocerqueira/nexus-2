@@ -73,14 +73,21 @@ orquestrador
 | `resumo` | str | Texto curto (aparece em logs e no subject do email) |
 | `dados` | list[dict] | Registros individuais — iterados nos templates Jinja com `{% for item in dados %}` |
 
-## Chaves opcionais mas recomendadas
+## Chaves opcionais consumidas pelo orquestrador
 
 | Chave | Tipo | Descrição |
 |---|---|---|
-| `fingerprint` | str | SHA-256 do conjunto de dados — impede re-notificar os mesmos dados |
+| `contatos_setores` | list | Destinatários dinâmicos: `[{"nome", "whatsapp", "email", "setor"}]`. Mesclados aos fixos (`alertas_destinatarios`), dedup por whatsapp. Normalize o fone com `normalizar_whatsapp()`. |
+| `grupos_por_destinatario` | list | `[{"destinatario": {...}, "itens": [...]}]` — cada destinatário recebe SÓ os itens do grupo dele (ex: vendedor recebe só os pedidos dele). |
+| `fingerprint` | str | Auditoria (`historico.hash_arquivo`). A dedup real é **por item** — ver seção Fingerprint. |
+
+## Chaves livres (viram variáveis Jinja nos templates)
+
+| Chave | Tipo | Descrição |
+|---|---|---|
 | `estatisticas` | dict | Métricas agregadas — usadas diretamente nos cards dos templates |
 | `estatisticas_por_grupo` | list | Agrupamento secundário para a tabela de resumo |
-| `contatos_notificacao` | list | Quem notificar (pode vir do nexus_metas ou do orquestrador) |
+| qualquer outra | — | Disponível no template como `{{ nome_da_chave }}` |
 
 ---
 
@@ -187,13 +194,22 @@ df["limite"] = df["limite"].fillna(0)  # coluna da direita pode ser NaN nos left
 
 ---
 
-## Fingerprint (deduplicação)
+## Fingerprint e cooldown (deduplicação POR ITEM)
 
-Evita enviar a mesma notificação duas vezes quando o alerta roda em ciclos.
+Você **não precisa implementar dedup** — o orquestrador faz sozinho:
+
+1. Para cada linha de `dados`, calcula SHA-256 da linha inteira
+2. Consulta `alertas_itens_notificados`: item já notificado dentro do `cooldown_minutos`? → pula só ele
+3. Item novo (ou com qualquer valor alterado) → dispara na hora
+4. Cooldown só conta quando alguma entrega foi criada de fato (sem destinatário / rate limit / sem template → não trava)
+
+Consequência prática: **mudança em qualquer campo da linha = item "novo"**. Se sua
+query retorna campos voláteis (timestamp de consulta, contadores), remova-os do
+SELECT ou o dedup nunca vai segurar nada.
+
+O `fingerprint` que você retorna no payload é só auditoria (`historico.hash_arquivo`):
 
 ```python
-# Inclua nas chaves os campos que identificam UNICAMENTE cada ocorrência.
-# Ordene (sorted) para que a ordem dos registros não afete o hash.
 chaves = sorted(
     (str(row.get("pedido", "")), str(row.get("cod_produto", "")))
     for row in df.to_dict("records")
@@ -201,20 +217,38 @@ chaves = sorted(
 fingerprint = hashlib.sha256(json.dumps(chaves).encode()).hexdigest()
 ```
 
-O orquestrador compara o fingerprint com o da última execução.
-Se igual → mesmo conjunto de dados → não notifica novamente.
+`?forcar=true` na API ignora cooldown e dedup (testes manuais).
 
 ---
 
-## Consolidado vs Individual
+## Agrupado vs Individual (modo_mensagem)
 
-| Modo | Quando usar | Template usado |
+O modo é **por destinatário fixo**, configurado em `alertas_destinatarios.modo_mensagem`
+(Admin Panel). Destinatários dinâmicos (`contatos_setores`) são sempre `individual`.
+
+| Modo | Comportamento | Template usado |
 |---|---|---|
-| **Consolidado** | Muitos registros, resumo geral suficiente | `email_consolidado_html.html`, `whatsapp_consolidado.txt` |
-| **Individual** | Cada ocorrência precisa notificar um destinatário diferente (ex: o vendedor do pedido) | `email_individual_html.html`, `whatsapp_individual.txt` |
+| `individual` (padrão) | 1 entrega por item novo — campos do item viram variáveis Jinja direto (`{{ pedido }}`, não `{{ item.pedido }}`) | `whatsapp_individual.txt`, `email_individual_*` |
+| `agrupado` | 1 entrega com todos os itens novos — itere `{% for item in dados %}` | `whatsapp_consolidado.txt`, `email_consolidado_*` |
 
-No modo individual, o orquestrador itera sobre `dados` e renderiza um template por item,
-passando os campos do item diretamente como variáveis Jinja (não como `item.campo`, mas como `campo`).
+Canal por destinatário (`canais`: whatsapp/email/sms) também vem de `alertas_destinatarios`.
+Template inexistente para (canal, modo) → entrega daquele canal é pulada com warning.
+
+---
+
+## O que o orquestrador faz por você (não reimplemente)
+
+| Recurso | Como funciona |
+|---|---|
+| **Dedup + cooldown por item** | Automático sobre `dados` (ver seção Fingerprint) |
+| **Destinatários fixos** | `alertas_destinatarios` via Admin Panel — merge com os dinâmicos, dedup por whatsapp |
+| **Validação de contatos** | Todo destino passa por `normalizar_whatsapp`/`validar_email` do core antes de entrar na fila — inválido é pulado com warning |
+| **Rate limit** | `limite_hora`/`limite_dia` por (destinatário × alerta), configurado no admin |
+| **Janela de silêncio** | Usuário com silêncio ativo → entrega criada com `enviar_apos` = fim da janela |
+| **Modo teste** | Configuração global redireciona TODAS as entregas para número/email de teste |
+| **Fila de entregas** | Claim atômico pelo n8n (sem envio duplicado), retry automático (3× em 24h), purga de antigas |
+| **Tokens dinâmicos** | Parâmetros com `{{hoje}}`, `{{ontem}}`, `{{mes_anterior_inicio}}`... resolvidos antes de chegar no processador |
+| **Histórico** | Cada disparo registrado em `historico` com total de entregas |
 
 ---
 
@@ -299,11 +333,12 @@ Troque apenas a cor no CSS do `email_consolidado_html.html`.
 ## Checklist ao criar novo alerta
 
 - [ ] Renomeou a pasta (sem underscore inicial)
-- [ ] Atualizou `config.json` (titulo, descricao, severidade, parametros)
-- [ ] Adaptou `consultas.sql` com as queries reais
-- [ ] Renomeou a classe no `processador.py`
+- [ ] Atualizou `config.json` (titulo, descricao, severidade, **cooldown_minutos**, parametros)
+- [ ] Adaptou `consultas.sql` com as queries reais (sem campos voláteis no SELECT — quebram o dedup)
+- [ ] Renomeou a classe no `processador.py` (mantendo o prefixo `Processador`)
 - [ ] Ajustou `CONEXAO_ERP` e `CONEXAO_METAS` se necessário
 - [ ] Adaptou `verificar()` com a condição real do alerta
-- [ ] Definiu as chaves do fingerprint (campos únicos por ocorrência)
+- [ ] Telefones do ERP passando por `normalizar_whatsapp()` antes de ir pra `contatos_setores`
 - [ ] Atualizou as colunas nas tabelas dos templates HTML
-- [ ] Testou com dados reais antes de agendar
+- [ ] Subiu a aplicação e conferiu o log: sem warning de contrato para a sua pasta
+- [ ] Testou com `?forcar=true` e depois com dados reais antes de agendar

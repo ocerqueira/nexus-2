@@ -18,19 +18,23 @@ Fluxo:
 import hashlib
 import json
 import logging
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
 from app.bd import engine
+from app.core.entregas_comum import (
+    atualizar_historico_total,
+    calcular_enviar_apos,
+    destino_canal,
+    inserir_entrega,
+    obter_modo_teste,
+)
 from app.core.renderizador_mensagens import renderizar_entrega
 from app.core.resolvedor_parametros import resolver_tokens
 
 logger = logging.getLogger(__name__)
-
-_TZ_LOCAL = ZoneInfo("America/Sao_Paulo")
 
 
 class AlertaNaoEncontrado(Exception):
@@ -80,24 +84,6 @@ def _buscar_destinatarios(alerta_id: int) -> list[dict]:
             WHERE ad.alerta_id = :aid AND ad.ativo = TRUE AND u.ativo = TRUE
         """), {"aid": alerta_id}).mappings().all()
     return [dict(r) for r in rows]
-
-
-def _obter_modo_teste() -> tuple[bool, str | None, str | None]:
-    """
-    Retorna (modo_teste_ativo, email_teste, whatsapp_teste) das configurações do banco.
-    Em caso de falha (banco inacessível, tabela inexistente), retorna False
-    para não bloquear o disparo de alertas em produção.
-    """
-    try:
-        with engine.connect() as c:
-            rows = c.execute(text(
-                "SELECT chave, valor FROM configuracoes "
-                "WHERE chave IN ('modo_teste','test_email','test_whatsapp')"
-            )).mappings().all()
-        cfg = {r["chave"]: r["valor"] for r in rows}
-        return cfg.get("modo_teste") == "true", cfg.get("test_email"), cfg.get("test_whatsapp")
-    except Exception:
-        return False, None, None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -216,43 +202,6 @@ def _rate_limit_excedido(dest: dict, alerta_id: int, canal: str) -> bool:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Janela de silêncio
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _calcular_enviar_apos(dest: dict) -> datetime | None:
-    """
-    Se destinatário tem janela de silêncio ativa e agora está dentro dela,
-    retorna o próximo timestamp após o fim da janela.
-    """
-    if not dest.get("silencio_ativo"):
-        return None
-
-    inicio: time | None = dest.get("silencio_inicio")
-    fim: time | None    = dest.get("silencio_fim")
-    if not inicio or not fim:
-        return None
-
-    agora = datetime.now(_TZ_LOCAL)
-    agora_time = agora.time()
-
-    # Janela pode cruzar meia-noite (ex: 22:00 → 06:00)
-    if inicio <= fim:
-        em_janela = inicio <= agora_time < fim
-    else:
-        em_janela = agora_time >= inicio or agora_time < fim
-
-    if not em_janela:
-        return None
-
-    # Calcula próximo fim da janela
-    fim_hoje = agora.replace(hour=fim.hour, minute=fim.minute, second=0, microsecond=0)
-    if fim_hoje <= agora:
-        fim_hoje += timedelta(days=1)
-
-    return fim_hoje.replace(tzinfo=None)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Destinatários dinâmicos
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -319,50 +268,6 @@ def _merge_destinatarios_dinamicos(
             })
 
     return resultado
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Entregas
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _destino_canal(dest: dict, canal: str) -> str | None:
-    if canal == "whatsapp":
-        return dest.get("whatsapp_numero") or dest.get("whatsapp")
-    if canal == "email":
-        return dest.get("email")
-    return None
-
-
-def _inserir_entrega(
-    historico_id: int | None,
-    alerta_id: int,
-    dest: dict,
-    canal: str,
-    payload: dict,
-    status: str = "pendente",
-    enviar_apos: datetime | None = None,
-) -> int:
-    usuario_id = dest.get("usuario_id")
-    destino = _destino_canal(dest, canal)
-
-    with engine.begin() as c:
-        row = c.execute(text("""
-            INSERT INTO entregas
-                (historico_id, alerta_id, usuario_id, canal, destino, payload, status, enviar_apos)
-            VALUES
-                (:hid, :aid, :uid, :canal, :destino, :payload, :status, :enviar_apos)
-            RETURNING id
-        """), {
-            "hid": historico_id,
-            "aid": alerta_id,
-            "uid": usuario_id,
-            "canal": canal,
-            "destino": destino or "",
-            "payload": json.dumps(payload, ensure_ascii=False),
-            "status": status,
-            "enviar_apos": enviar_apos,
-        }).scalar()
-    return row
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -497,7 +402,7 @@ def orquestrar_alerta(
     )
 
     # 6. Modo teste
-    modo_teste, test_email, test_whatsapp = _obter_modo_teste()
+    modo_teste, test_email, test_whatsapp = obter_modo_teste()
     if modo_teste:
         logger.warning(f"[MODO TESTE] '{nome_alerta}': substituindo {len(todos_dests)} destinatário(s)")
         todos_dests = [{
@@ -522,6 +427,7 @@ def orquestrar_alerta(
     # 8. Montar e inserir entregas (apenas se notificar=True)
     entregas_criadas: list[dict] = []
     fps_disparados: list[str] = []
+    entrega_agrupada_criada = False
     historico_id = None
 
     if notificar:
@@ -532,7 +438,7 @@ def orquestrar_alerta(
             canais = dest.get("canais") or ["whatsapp"]
 
             for canal in canais:
-                destino = _destino_canal(dest, canal)
+                destino = destino_canal(dest, canal)
                 if not destino:
                     continue
 
@@ -545,14 +451,15 @@ def orquestrar_alerta(
                     })
                     continue
 
-                enviar_apos = _calcular_enviar_apos(dest)
+                enviar_apos = calcular_enviar_apos(dest)
 
                 if modo == "agrupado":
                     linhas = [l for l, _ in itens_a_notificar if l is not None]
                     ctx = {**contexto_base, "dados": linhas, "total": len(linhas)}
                     payload = renderizar_entrega(nome_alerta, canal, "agrupado", ctx)
                     if payload:
-                        eid = _inserir_entrega(historico_id, alerta["id"], dest, canal, payload, enviar_apos=enviar_apos)
+                        eid = inserir_entrega(historico_id, dest, canal, payload, alerta_id=alerta["id"], enviar_apos=enviar_apos)
+                        entrega_agrupada_criada = True
                         entregas_criadas.append({
                             "id": eid, "status": "pendente" if not enviar_apos else "agendado",
                             "canal": canal, "destino": destino,
@@ -564,7 +471,7 @@ def orquestrar_alerta(
                         ctx_linha = linha or {}
                         payload = renderizar_entrega(nome_alerta, canal, "individual", contexto_base, ctx_linha)
                         if payload:
-                            eid = _inserir_entrega(historico_id, alerta["id"], dest, canal, payload, enviar_apos=enviar_apos)
+                            eid = inserir_entrega(historico_id, dest, canal, payload, alerta_id=alerta["id"], enviar_apos=enviar_apos)
                             entregas_criadas.append({
                                 "id": eid, "status": "pendente",
                                 "canal": canal, "destino": destino,
@@ -574,12 +481,20 @@ def orquestrar_alerta(
                             if fp not in fps_disparados:
                                 fps_disparados.append(fp)
 
-        if any(d.get("modo_mensagem") == "agrupado" for d in todos_dests):
+        if entrega_agrupada_criada:
             fps_disparados = [fp for _, fp in itens_a_notificar]
 
-        # 9. Atualizar fingerprints + ultimo_disparo (só quando notifica de verdade)
-        _atualizar_fingerprints(alerta["id"], list(set(fps_disparados)))
-        _atualizar_ultimo_disparo_alerta(alerta["id"])
+        # 9. Atualizar fingerprints + ultimo_disparo — apenas se alguma entrega
+        # foi criada. Senão o cooldown travaria disparos futuros de algo que
+        # nunca chegou a ser enviado (sem destinatário, rate limit, template ausente).
+        if fps_disparados:
+            _atualizar_fingerprints(alerta["id"], list(set(fps_disparados)))
+            _atualizar_ultimo_disparo_alerta(alerta["id"])
+
+        atualizar_historico_total(
+            historico_id,
+            len([d for d in entregas_criadas if d.get("id")]),
+        )
 
     pendentes = [d for d in entregas_criadas if d.get("status") == "pendente"]
     bloqueados = [d for d in entregas_criadas if d.get("status") == "bloqueado_rate_limit"]

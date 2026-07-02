@@ -51,11 +51,14 @@ def listar_pendentes(
     incluir_retry: bool = Query(False, description="Se True, inclui falhos com menos de 3 tentativas nas últimas 24h"),
 ) -> dict:
     """
-    Retorna entregas prontas para envio.
+    Retorna entregas prontas para envio e faz claim atômico de cada uma
+    (status → 'processando'). Duas chamadas simultâneas nunca recebem a
+    mesma entrega (FOR UPDATE SKIP LOCKED).
 
     Retorna: status='pendente' com enviar_apos <= NOW() (ou NULL).
     Com incluir_retry=true: também retorna status='falhou' com tentativas < 3
-    e criado nas últimas 24h (re-fila automática de falhas transitórias).
+    nas últimas 24h, e 'processando' travadas há mais de 15 min (n8n caiu
+    antes do callback).
     """
     filtro_canal = "AND canal = :canal" if canal else ""
     filtro_retry = """
@@ -64,32 +67,45 @@ def listar_pendentes(
             AND d.tentativas < 3
             AND d.criado_em > NOW() - INTERVAL '24 hours'
         )
+        OR (
+            d.status = 'processando'
+            AND d.processando_em < NOW() - INTERVAL '15 minutes'
+            AND d.criado_em > NOW() - INTERVAL '24 hours'
+        )
     """ if incluir_retry else ""
 
-    with engine.connect() as c:
+    with engine.begin() as c:
         rows = c.execute(text(f"""
+            WITH claim AS (
+                SELECT d.id, d.status AS status_atual
+                FROM entregas d
+                WHERE (
+                    (d.status = 'pendente' AND (d.enviar_apos IS NULL OR d.enviar_apos <= NOW()))
+                    {filtro_retry}
+                )
+                {filtro_canal}
+                ORDER BY d.criado_em ASC
+                LIMIT :limite
+                FOR UPDATE SKIP LOCKED
+            ),
+            upd AS (
+                UPDATE entregas e
+                SET status = 'processando', processando_em = NOW()
+                FROM claim
+                WHERE e.id = claim.id
+                RETURNING e.id, e.canal, e.destino, e.payload, claim.status_atual,
+                          e.tentativas, e.enviar_apos, e.criado_em, e.acao_requerida,
+                          e.alerta_id, e.relatorio_id
+            )
             SELECT
-                d.id,
-                d.canal,
-                d.destino,
-                d.payload,
-                d.status         AS status_atual,
-                d.tentativas,
-                d.enviar_apos,
-                d.criado_em,
-                d.acao_requerida,
+                upd.id, upd.canal, upd.destino, upd.payload, upd.status_atual,
+                upd.tentativas, upd.enviar_apos, upd.criado_em, upd.acao_requerida,
                 a.nome  AS alerta_nome,
                 r.nome  AS relatorio_nome
-            FROM entregas d
-            LEFT JOIN alertas    a ON a.id = d.alerta_id
-            LEFT JOIN relatorios r ON r.id = d.relatorio_id
-            WHERE (
-                (d.status = 'pendente' AND (d.enviar_apos IS NULL OR d.enviar_apos <= NOW()))
-                {filtro_retry}
-            )
-            {filtro_canal}
-            ORDER BY d.criado_em ASC
-            LIMIT :limite
+            FROM upd
+            LEFT JOIN alertas    a ON a.id = upd.alerta_id
+            LEFT JOIN relatorios r ON r.id = upd.relatorio_id
+            ORDER BY upd.criado_em ASC
         """), {"limite": limite, "canal": canal}).mappings().all()
 
     return {
@@ -158,6 +174,36 @@ def atualizar_status(
 
     logger.info(f"Entrega {entrega_id} → {body.status}")
     return {"id": entrega_id, "status": body.status}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Purga de entregas antigas (payloads com PDF em base64 incham a tabela)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.delete("/antigas")
+def purgar_antigas(
+    dias: int = Query(30, ge=1, description="Remove entregas finalizadas mais antigas que N dias"),
+) -> dict:
+    """
+    Remove entregas em status terminal (enviado, confirmado, cancelado, falhou,
+    bloqueado_rate_limit) criadas há mais de `dias` dias.
+    O histórico (tabela historico) é preservado — só o payload pesado sai.
+
+    Chamar periodicamente via cron do n8n (ex: 1x por dia).
+    """
+    with engine.begin() as c:
+        total = c.execute(text("""
+            WITH del AS (
+                DELETE FROM entregas
+                WHERE status IN ('enviado', 'confirmado', 'cancelado', 'falhou', 'bloqueado_rate_limit')
+                  AND criado_em < NOW() - make_interval(days => :dias)
+                RETURNING id
+            )
+            SELECT COUNT(*) FROM del
+        """), {"dias": dias}).scalar()
+
+    logger.info(f"Purga de entregas: {total} removidas (> {dias} dias)")
+    return {"removidas": total, "dias": dias}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

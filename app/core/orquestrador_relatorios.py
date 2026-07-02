@@ -15,18 +15,21 @@ Fontes de destinatários (em ordem de prioridade/merge):
 
 import json
 import logging
-from datetime import datetime, time, timedelta
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
 from app.bd import engine
+from app.core.entregas_comum import (
+    atualizar_historico_total,
+    calcular_enviar_apos,
+    destino_canal,
+    inserir_entrega,
+    obter_modo_teste,
+)
 from app.core.renderizador import gerar_pdf, renderizar_html
 from app.core.resolvedor_parametros import resolver_tokens
 
 logger = logging.getLogger(__name__)
-
-_TZ_LOCAL = ZoneInfo("America/Sao_Paulo")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -107,53 +110,6 @@ def _buscar_usuario(usuario_id: int) -> dict | None:
             FROM usuarios WHERE id = :uid AND ativo = TRUE
         """), {"uid": usuario_id}).mappings().first()
     return dict(row) if row else None
-
-
-def _obter_modo_teste() -> tuple[bool, str | None, str | None]:
-    try:
-        with engine.connect() as c:
-            rows = c.execute(text(
-                "SELECT chave, valor FROM configuracoes "
-                "WHERE chave IN ('modo_teste','test_email','test_whatsapp')"
-            )).mappings().all()
-        cfg = {r["chave"]: r["valor"] for r in rows}
-        return cfg.get("modo_teste") == "true", cfg.get("test_email"), cfg.get("test_whatsapp")
-    except Exception:
-        return False, None, None
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Janela de silêncio
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _calcular_enviar_apos(dest: dict) -> datetime | None:
-    """
-    Se o destinatário tem janela de silêncio ativa e agora está dentro dela,
-    retorna o próximo timestamp após o fim da janela (entrega agendada).
-    Janela pode cruzar meia-noite (ex: 22:00 → 06:00).
-    """
-    if not dest.get("silencio_ativo"):
-        return None
-    inicio: time | None = dest.get("silencio_inicio")
-    fim: time | None    = dest.get("silencio_fim")
-    if not inicio or not fim:
-        return None
-
-    agora = datetime.now(_TZ_LOCAL)
-    agora_t = agora.time()
-
-    if inicio <= fim:
-        em_janela = inicio <= agora_t < fim
-    else:
-        em_janela = agora_t >= inicio or agora_t < fim
-
-    if not em_janela:
-        return None
-
-    fim_hoje = agora.replace(hour=fim.hour, minute=fim.minute, second=0, microsecond=0)
-    if fim_hoje <= agora:
-        fim_hoje += timedelta(days=1)
-    return fim_hoje.replace(tzinfo=None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -247,42 +203,6 @@ def _registrar_historico(relatorio: dict, parametros: dict, total_entregas: int)
         return None
 
 
-def _inserir_entrega(
-    historico_id: int | None,
-    relatorio_id: int,
-    dest: dict,
-    canal: str,
-    payload: dict,
-    enviar_apos: datetime | None = None,
-) -> int:
-    usuario_id = dest.get("usuario_id")
-
-    if canal == "whatsapp":
-        destino = dest.get("whatsapp_numero") or ""
-    elif canal == "email":
-        destino = dest.get("email") or ""
-    else:
-        destino = ""
-
-    with engine.begin() as c:
-        row = c.execute(text("""
-            INSERT INTO entregas
-                (historico_id, relatorio_id, usuario_id, canal, destino, payload, status, enviar_apos)
-            VALUES
-                (:hid, :rid, :uid, :canal, :destino, :payload, 'pendente', :enviar_apos)
-            RETURNING id
-        """), {
-            "hid": historico_id,
-            "rid": relatorio_id,
-            "uid": usuario_id,
-            "canal": canal,
-            "destino": destino,
-            "payload": json.dumps(payload, ensure_ascii=False),
-            "enviar_apos": enviar_apos,
-        }).scalar()
-    return row
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Compressão de PDF
 # ─────────────────────────────────────────────────────────────────────────────
@@ -296,6 +216,7 @@ def _comprimir_pdf(pdf_bytes: bytes) -> bytes:
     import shutil, subprocess, tempfile, os
     if not shutil.which("gs"):
         return pdf_bytes
+    path_in = path_out = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as fin:
             fin.write(pdf_bytes)
@@ -315,10 +236,11 @@ def _comprimir_pdf(pdf_bytes: bytes) -> bytes:
         logger.warning(f"Compressão PDF falhou: {e}")
     finally:
         for p in [path_in, path_out]:
-            try:
-                os.unlink(p)
-            except Exception:
-                pass
+            if p:
+                try:
+                    os.unlink(p)
+                except Exception:
+                    pass
     return pdf_bytes
 
 
@@ -335,6 +257,7 @@ def orquestrar_relatorio(
     agendamento_id: int | None = None,
     usuario_solicitante_id: int | None = None,
     comprimir_pdf: bool = True,
+    dados_precomputados: dict | None = None,
 ) -> dict:
     """
     Orquestra geração + dispatch de um relatório.
@@ -347,6 +270,9 @@ def orquestrar_relatorio(
         agendamento_id:         Se veio de agendamento (opcional)
         usuario_solicitante_id: Usuário que solicitou on-demand (opcional)
         comprimir_pdf:          Se True, tenta compressão via ghostscript
+        dados_precomputados:    Resultado de buscar_dados() já executado pelo caller
+                                (evita rodar o processador 2x no modo 'unico').
+                                Ignorado no modo 'por_destinatario'.
 
     Returns:
         Dict com entregas criadas e metadados.
@@ -364,7 +290,7 @@ def orquestrar_relatorio(
     todos_dests = _merge_destinatarios(dest_fixos, dest_agendamento, usuario_avulso, canais_default)
 
     # Modo teste
-    modo_teste, test_email, test_whatsapp = _obter_modo_teste()
+    modo_teste, test_email, test_whatsapp = obter_modo_teste()
     if modo_teste and todos_dests:
         logger.warning(f"[MODO TESTE] '{nome_relatorio}': substituindo {len(todos_dests)} destinatário(s)")
         todos_dests = [{
@@ -384,8 +310,11 @@ def orquestrar_relatorio(
 
     if modo_execucao == "unico":
         # Uma execução → verificar se processador retorna grupos_por_destinatario
-        processador = processador_classe()
-        dados = processador.buscar_dados(parametros)
+        if dados_precomputados is not None:
+            dados = dados_precomputados
+        else:
+            processador = processador_classe()
+            dados = processador.buscar_dados(parametros)
         resumo = dados.get("resumo", "")
         grupos = dados.get("grupos_por_destinatario", [])
 
@@ -421,7 +350,7 @@ def orquestrar_relatorio(
                 pdf_full = _gerar_e_comprimir(nome_relatorio, dados, titulo, subtitulo, comprimir_pdf) if precisa_pdf_full else None
                 for dest in dest_full:
                     entregas_criadas.extend(_entregar_relatorio(
-                        historico_id, relatorio["id"], dest, pdf_full, resumo,
+                        historico_id, relatorio["id"], dest, pdf_full, resumo, titulo,
                     ))
 
             # PDF individual por grupo
@@ -441,7 +370,7 @@ def orquestrar_relatorio(
                     continue
 
                 entregas_criadas.extend(_entregar_relatorio(
-                    historico_id, relatorio["id"], dest_g, pdf_g, resumo_g,
+                    historico_id, relatorio["id"], dest_g, pdf_g, resumo_g, titulo,
                 ))
 
             logger.info(
@@ -459,7 +388,7 @@ def orquestrar_relatorio(
 
             for dest in todos_dests:
                 entregas_criadas.extend(_entregar_relatorio(
-                    historico_id, relatorio["id"], dest, pdf_bytes, resumo,
+                    historico_id, relatorio["id"], dest, pdf_bytes, resumo, titulo,
                 ))
 
     else:
@@ -482,8 +411,10 @@ def orquestrar_relatorio(
                 continue
 
             entregas_criadas.extend(_entregar_relatorio(
-                historico_id, relatorio["id"], dest, pdf_bytes, resumo,
+                historico_id, relatorio["id"], dest, pdf_bytes, resumo, titulo,
             ))
+
+    atualizar_historico_total(historico_id, len(entregas_criadas))
 
     return {
         "relatorio": {
@@ -515,12 +446,13 @@ def _entregar_relatorio(
     dest: dict,
     pdf_bytes: bytes | None,
     resumo: str,
+    titulo: str,
 ) -> list[dict]:
     """Cria entregas para todos os canais de um destinatário."""
     import base64
     resultado = []
     canais = dest.get("canais") or ["whatsapp"]
-    enviar_apos = _calcular_enviar_apos(dest)
+    enviar_apos = calcular_enviar_apos(dest)
 
     for canal in canais:
         if canal == "whatsapp":
@@ -533,27 +465,26 @@ def _entregar_relatorio(
                     "text": resumo or "Documento",
                     "pdf_base64": base64.b64encode(pdf_bytes).decode() if pdf_bytes else None,
                 }
-            destino = dest.get("whatsapp_numero") or ""
 
         elif canal == "email":
             if not pdf_bytes:
                 logger.warning(f"Email para {dest.get('nome')} ignorado: PDF não gerado")
                 continue
             payload = {
-                "assunto": f"Relatório: {dest.get('nome', 'N/D')}",
+                "assunto": f"Relatório: {titulo}",
                 "pdf_base64": base64.b64encode(pdf_bytes).decode(),
                 "resumo": resumo,
             }
-            destino = dest.get("email") or ""
 
         else:
             continue
 
+        destino = destino_canal(dest, canal)
         if not destino:
-            logger.warning(f"Destinatário {dest.get('nome')} sem {canal} — ignorado")
+            logger.warning(f"Destinatário {dest.get('nome')} sem {canal} válido — ignorado")
             continue
 
-        did = _inserir_entrega(historico_id, relatorio_id, dest, canal, payload, enviar_apos)
+        did = inserir_entrega(historico_id, dest, canal, payload, relatorio_id=relatorio_id, enviar_apos=enviar_apos)
         resultado.append({
             "id": did, "status": "pendente",
             "canal": canal, "destino": destino,

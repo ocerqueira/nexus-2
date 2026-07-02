@@ -3,7 +3,6 @@ Rotas de solicitação de relatórios.
 """
 
 import base64
-import importlib
 import json
 import logging
 from pathlib import Path as FilePath
@@ -13,6 +12,7 @@ from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 
 from app.core.orquestrador_relatorios import orquestrar_relatorio
+from app.core.processadores import carregar_processador
 from app.core.renderizador import gerar_pdf, renderizar_html
 from app.core.resolvedor_parametros import resolver_tokens
 
@@ -39,23 +39,16 @@ def _carregar_relatorio(nome: str) -> dict | None:
     if not config_path.exists():
         return None
 
-    try:
-        mod = importlib.import_module(f"app.relatorios.{nome}.processador")
-    except ImportError:
+    classe = carregar_processador("relatorio", nome)
+    if classe is None:
         return None
 
     cfg = json.loads(config_path.read_text(encoding="utf-8"))
-
-    for attr_name in dir(mod):
-        attr = getattr(mod, attr_name)
-        if isinstance(attr, type) and attr_name.startswith("Processador") and attr_name != "Processador":
-            return {
-                "classe":    attr,
-                "titulo":    cfg.get("titulo", nome),
-                "subtitulo": cfg.get("subtitulo"),
-            }
-
-    return None
+    return {
+        "classe":    classe,
+        "titulo":    cfg.get("titulo", nome),
+        "subtitulo": cfg.get("subtitulo"),
+    }
 
 
 @router.post("/{nome_relatorio}/solicitar")
@@ -128,6 +121,7 @@ def solicitar_relatorio(
                 agendamento_id=agendamento_id,
                 usuario_solicitante_id=usuario_id,
                 comprimir_pdf=True,
+                dados_precomputados=dados,
             )
         except Exception as e:
             logger.error(f"Erro ao criar entregas para '{nome_relatorio}': {e}", exc_info=True)

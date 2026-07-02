@@ -1,6 +1,5 @@
 """Shared imports, constants and helpers for the admin sub-package."""
 
-import importlib
 import json
 import logging
 from datetime import datetime, timedelta
@@ -18,6 +17,7 @@ from app.core.calculadora_agenda import calcular_proximo_envio
 from app.core.criptografia import criptografar
 from app.core.gerenciador_conexoes import gerenciador_conexoes
 from app.core.orquestrador_alertas import orquestrar_alerta
+from app.core.processadores import carregar_processador
 from app.core.sincronizador import sincronizar_filesystem_com_banco
 from app.core.sincronizador_ad import sincronizar_ad
 
@@ -106,35 +106,12 @@ def _formatar_data(dt) -> str:
 
 
 def _carregar_processador_relatorio(nome: str) -> dict | None:
-    """
-    Carrega dinamicamente a classe Processador* de app/relatorios/{nome}/processador.py.
-    Usa importlib para descobrir a classe sem precisar importar cada módulo no startup.
-    Retorna None se o config.json não existir ou o módulo não puder ser importado.
-    """
+    """Wrapper de carregar_processador que preserva o formato {classe} usado pelas rotas admin."""
     if not (_PASTA_RELATORIOS / nome / "config.json").exists():
         return None
-    try:
-        mod = importlib.import_module(f"app.relatorios.{nome}.processador")
-    except ImportError:
-        return None
-    for attr_name in dir(mod):
-        attr = getattr(mod, attr_name)
-        if isinstance(attr, type) and attr_name.startswith("Processador") and attr_name != "Processador":
-            return {"classe": attr}
-    return None
+    classe = carregar_processador("relatorio", nome)
+    return {"classe": classe} if classe else None
 
 
 def _carregar_processador_alerta(nome: str):
-    """
-    Carrega dinamicamente a classe Processador* de app/alertas/{nome}/processador.py.
-    Mesma estratégia de _carregar_processador_relatorio, mas para alertas.
-    """
-    try:
-        mod = importlib.import_module(f"app.alertas.{nome}.processador")
-    except ImportError:
-        return None
-    for attr_name in dir(mod):
-        attr = getattr(mod, attr_name)
-        if isinstance(attr, type) and attr_name.startswith("Processador") and attr_name != "Processador":
-            return attr
-    return None
+    return carregar_processador("alerta", nome)

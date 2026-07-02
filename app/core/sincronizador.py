@@ -13,6 +13,7 @@ from typing import Literal
 from sqlalchemy import text
 
 from app.bd import engine
+from app.core.processadores import verificar_contrato
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,18 @@ def _listar_pastas_validas(pasta_raiz: Path) -> list[Path]:
     return pastas
 
 
+def _verificar_contratos(tipo: str, pastas: list[Path]) -> None:
+    """
+    Confere no startup se cada pasta tem processador válido (classe Processador*
+    com os métodos do contrato). Só avisa no log — não bloqueia o boot nem
+    desativa o recurso, para não derrubar os demais por causa de um quebrado.
+    """
+    for pasta in pastas:
+        erro = verificar_contrato(tipo, pasta.name)
+        if erro:
+            logger.warning(f"[{tipo}s] contrato inválido em '{pasta.name}': {erro}")
+
+
 def _sincronizar_relatorios() -> dict:
     """
     Sincroniza pastas de app/relatorios/ com a tabela 'relatorios'.
@@ -59,6 +72,7 @@ def _sincronizar_relatorios() -> dict:
     """
     pastas_filesystem = _listar_pastas_validas(PASTA_RELATORIOS)
     nomes_filesystem = {p.name for p in pastas_filesystem}
+    _verificar_contratos("relatorio", pastas_filesystem)
 
     estatisticas = {
         "inseridos": 0,
@@ -193,6 +207,7 @@ def _sincronizar_alertas() -> dict:
     """
     pastas_filesystem = _listar_pastas_validas(PASTA_ALERTAS)
     nomes_filesystem = {p.name for p in pastas_filesystem}
+    _verificar_contratos("alerta", pastas_filesystem)
 
     estatisticas = {
         "inseridos": 0,

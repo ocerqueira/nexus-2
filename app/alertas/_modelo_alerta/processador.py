@@ -4,10 +4,11 @@ Fonte: ERP Firebird + PostgreSQL (nexus_metas)
 
 Como usar:
   1. Copie esta pasta para app/alertas/nome_do_alerta/
-  2. Renomeie a classe e o ARQUIVO_CONSULTAS
+  2. Renomeie a classe (precisa começar com 'Processador' — é assim que o
+     sistema descobre; o contrato validar+verificar é conferido no startup)
   3. Ajuste as conexões (CONEXAO_ERP / CONEXAO_METAS)
   4. Adapte verificar() com a lógica real
-  Veja LEIAME.md para cenários avançados.
+  Veja LEIAME.md para cenários avançados e tudo que o orquestrador faz por você.
 """
 
 import hashlib
@@ -20,6 +21,7 @@ from typing import Any
 import pandas as pd
 
 from app.core.carregador_sql import carregar_query
+from app.core.entregas_comum import normalizar_whatsapp
 from app.core.gerenciador_conexoes import gerenciador_conexoes
 
 logger = logging.getLogger(__name__)
@@ -74,13 +76,24 @@ class ProcessadorModeloAlerta:
           encontrou_dados  bool   — se há dados para disparar notificação
           total            int    — quantidade de registros encontrados
           resumo           str    — texto curto para logs e subject de email
-          dados            list   — registros individuais (iteram nos templates)
+          dados            list   — registros individuais (iteram nos templates;
+                                    a dedup por cooldown é POR ITEM desta lista)
 
-        Chaves opcionais mas recomendadas:
-          fingerprint             str   — SHA-256 para deduplicação
-          estatisticas            dict  — métricas agregadas (usadas nos templates)
-          estatisticas_por_grupo  list  — agregação por dimensão
-          contatos_notificacao    list  — quem notificar (populado aqui ou pelo orquestrador)
+        Chaves opcionais consumidas pelo orquestrador:
+          contatos_setores         list  — destinatários dinâmicos extraídos do ERP:
+                                           [{"nome", "whatsapp", "email", "setor"}]
+                                           Mesclados aos fixos, dedup por whatsapp.
+          grupos_por_destinatario  list  — cada destinatário recebe SÓ os itens dele:
+                                           [{"destinatario": {"nome","whatsapp","email"},
+                                             "itens": [...]}]
+          fingerprint              str   — auditoria (historico.hash_arquivo). A dedup
+                                           real é por item: SHA-256 de cada linha de
+                                           'dados', controlada pelo orquestrador.
+
+        Chaves livres (viram variáveis nos templates Jinja):
+          estatisticas             dict  — métricas agregadas para os cards
+          estatisticas_por_grupo   list  — agregação por dimensão
+          qualquer_outra           ...   — disponível como {{ qualquer_outra }}
         """
         # ── Parâmetros com defaults ────────────────────────────────────────
         cod_empresa     = parametros.get("cod_empresa", 1)
@@ -106,7 +119,7 @@ class ProcessadorModeloAlerta:
                 "dados": [],
                 "estatisticas": {},
                 "estatisticas_por_grupo": [],
-                "contatos_notificacao": [],
+                "contatos_setores": [],
             }
 
         # Firebird retorna colunas em UPPERCASE — normaliza para lowercase
@@ -176,7 +189,7 @@ class ProcessadorModeloAlerta:
                 "dados": [],
                 "estatisticas": {},
                 "estatisticas_por_grupo": [],
-                "contatos_notificacao": [],
+                "contatos_setores": [],
             }
 
         # ── 6. Agregação por grupo (dimensão principal) ───────────────────
@@ -213,22 +226,60 @@ class ProcessadorModeloAlerta:
                 f"maior valor: R$ {valor_max:,.2f}"
             )
 
-        # ── 9. Contatos de notificação (PostgreSQL) ───────────────────────
-        contatos = []
+        # ── 9. Destinatários dinâmicos (contatos_setores) ─────────────────
+        # Extraídos do ERP/banco auxiliar em runtime — sem cadastro no Nexus.
+        # O orquestrador mescla com os fixos (alertas_destinatarios) e
+        # deduplica por whatsapp. SEMPRE normalize o telefone com
+        # normalizar_whatsapp() — formatos variados do ERP viram o formato
+        # da Evolution API (5517999990000) ou None (descartado).
+        contatos_setores: list[dict] = []
+        vistos: set[str] = set()
         try:
             linhas_contatos = gerenciador_conexoes.executar(
                 conexao=CONEXAO_METAS,
                 query=carregar_query(ARQUIVO_CONSULTAS, "buscar_contatos_notificacao"),
                 parametros={"cod_empresa": cod_empresa},
             )
-            contatos = linhas_contatos
+            for c in linhas_contatos:
+                fone = normalizar_whatsapp(c.get("whatsapp") or c.get("telefone"))
+                if fone and fone not in vistos:
+                    vistos.add(fone)
+                    contatos_setores.append({
+                        "nome":     str(c.get("nome") or "").strip(),
+                        "whatsapp": fone,
+                        "email":    c.get("email"),
+                        "setor":    c.get("setor", ""),
+                    })
         except Exception:
             logger.warning("Não foi possível carregar contatos de notificação")
 
-        # ── 10. Fingerprint para deduplicação ─────────────────────────────
-        # Evita re-notificar o mesmo conjunto de dados em execuções consecutivas.
-        # Inclua nas chaves os campos que identificam UNICAMENTE cada ocorrência.
-        # A ordenação garante que a ordem dos registros não afete o hash.
+        # ── 9b. (Alternativa) grupos_por_destinatario ──────────────────────
+        # Use quando cada destinatário deve receber SÓ os itens dele
+        # (ex: cada vendedor recebe apenas os pedidos dele). O orquestrador
+        # cria entregas por (destinatário × itens do grupo). Descomente e adapte:
+        #
+        # grupos = []
+        # for cod_vend, df_v in df.groupby("cod_vendedor"):
+        #     primeiro = df_v.iloc[0]
+        #     fone = normalizar_whatsapp(primeiro.get("telefone_vendedor"))
+        #     if not fone:
+        #         continue
+        #     grupos.append({
+        #         "destinatario": {
+        #             "nome":     str(primeiro.get("nome_vendedor") or ""),
+        #             "whatsapp": fone,
+        #             "email":    primeiro.get("email_vendedor"),
+        #         },
+        #         "itens": df_v.to_dict("records"),
+        #     })
+        # # no payload final: "grupos_por_destinatario": grupos
+
+        # ── 10. Fingerprint (auditoria) ────────────────────────────────────
+        # Vai para historico.hash_arquivo. A deduplicação REAL é por item:
+        # o orquestrador calcula SHA-256 de cada linha de 'dados' e controla
+        # o cooldown por item em alertas_itens_notificados — item novo dispara
+        # na hora, item repetido espera o cooldown. Este hash do conjunto serve
+        # só para rastrear "o que foi visto" na auditoria.
         chaves_dedup = sorted(
             (
                 str(row.get("pedido", "")),
@@ -246,7 +297,8 @@ class ProcessadorModeloAlerta:
             "resumo": resumo,
             "fingerprint": fingerprint,
             "dados": df.to_dict("records"),
-            "contatos_notificacao": contatos,
+            "contatos_setores": contatos_setores,
+            # "grupos_por_destinatario": grupos,  # ver seção 9b
             "estatisticas": {
                 "valor_total":       valor_total,
                 "valor_max":         valor_max,

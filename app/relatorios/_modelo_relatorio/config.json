@@ -1,8 +1,10 @@
 {
   "titulo": "Nome do Relatório",
+  "subtitulo": "Subtítulo opcional exibido abaixo do título no PDF",
   "descricao": "Descreva aqui o que este relatório mostra, quais fontes usa e para quem se destina.",
   "categoria": "operacional",
   "modo_execucao": "unico",
+  "_doc_modo_execucao": "unico: 1 execução, mesmo PDF para todos | por_destinatario: 1 execução por destinatário aplicando relatorios_destinatarios.filtro_parametros sobre os parâmetros (ex: cada gerente recebe o PDF filtrado pela filial dele)",
   "parametros": [
     {
       "nome": "cod_empresa",

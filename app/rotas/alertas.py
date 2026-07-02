@@ -2,8 +2,6 @@
 Rotas de verificação de alertas.
 """
 
-import importlib
-import json
 import logging
 from pathlib import Path as FilePath
 
@@ -11,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 
 from app.core.orquestrador_alertas import AlertaNaoEncontrado, orquestrar_alerta
+from app.core.processadores import carregar_processador
 from app.core.resolvedor_parametros import resolver_tokens
 
 logger = logging.getLogger(__name__)
@@ -37,18 +36,7 @@ def _carregar_alerta(nome: str) -> type | None:
     config_path = _PASTA_ALERTAS / nome / "config.json"
     if not config_path.exists():
         return None
-
-    try:
-        mod = importlib.import_module(f"app.alertas.{nome}.processador")
-    except ImportError:
-        return None
-
-    for attr_name in dir(mod):
-        attr = getattr(mod, attr_name)
-        if isinstance(attr, type) and attr_name.startswith("Processador") and attr_name != "Processador":
-            return attr
-
-    return None
+    return carregar_processador("alerta", nome)
 
 
 @router.post("/{nome_alerta}/verificar")

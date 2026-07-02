@@ -259,6 +259,12 @@ class ProcessadorModeloRelatorio:
           top5           list   — top 5 por valor
           resumo_global  dict   — KPIs globais
           grafico_*      str|None — data URI base64 dos gráficos
+
+        Chaves consumidas pelo ORQUESTRADOR (entrega com notificar=true):
+          resumo         str   — texto do WhatsApp: caption do PDF ou mensagem
+                                 inteira quando formato_whatsapp='resumo_texto'
+          grupos_por_destinatario  list — 1 PDF filtrado por destinatário
+                                 (contrato documentado no config.json desta pasta)
         """
         hoje        = date.today()
         cod_empresa = parametros.get("cod_empresa", 1)
@@ -269,6 +275,7 @@ class ProcessadorModeloRelatorio:
 
         _vazio = {
             "total": 0, "periodo": periodo,
+            "resumo": f"Nenhum dado para o período {periodo}.",
             "registros": [], "grupos": [], "top5": [],
             "resumo_global": {},
             "grafico_barras": None, "grafico_tendencia": None,
@@ -422,9 +429,17 @@ class ProcessadorModeloRelatorio:
             logger.exception("Erro ao gerar gráficos")
 
         # ── 11. Payload final ─────────────────────────────────────────────
+        # 'resumo' vira o texto do WhatsApp na entrega (caption do PDF, ou a
+        # mensagem inteira quando o destinatário usa formato 'resumo_texto').
+        resumo = (
+            f"Relatório {periodo}: {len(df)} registro(s), "
+            f"R$ {valor_total:,.2f} — atingimento {atingimento_global:.0f}%"
+        )
+
         return {
             "total":            len(df),
             "periodo":          periodo,
+            "resumo":           resumo,
             "registros":        df.to_dict("records"),
             "grupos":           grupos,
             "top5":             top5,

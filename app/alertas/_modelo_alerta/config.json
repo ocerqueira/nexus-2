@@ -2,6 +2,9 @@
   "titulo": "Nome do Alerta",
   "descricao": "Descreva aqui o que este alerta detecta, quando dispara e quem notifica. Ex: detecta pedidos com valor acima do limite configurado por categoria e notifica vendedor + setores vinculados.",
   "severidade": "alto",
+  "cooldown_minutos": 60,
+  "_doc_severidade": "info | baixo | medio | alto | critico — vai para alertas.severidade no sync e fica disponível nos templates como {{ severidade }}",
+  "_doc_cooldown": "Janela em minutos em que o MESMO item (fingerprint) não re-notifica. Item novo dispara na hora. Só conta quando alguma entrega foi criada de fato.",
   "parametros": [
     {
       "nome": "cod_empresa",

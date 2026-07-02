@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     shared-mime-info \
     fonts-liberation \
     libfbclient2 \
+    ghostscript \
     && rm -rf /var/lib/apt/lists/*
 
 # uv

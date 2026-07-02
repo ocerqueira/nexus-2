@@ -37,7 +37,7 @@ cp -r app/relatorios/_modelo_relatorio app/relatorios/nome_do_relatorio
 ## Fluxo de dados
 
 ```
-rota HTTP (GET /relatorios/nome_do_relatorio)
+rota HTTP (POST /relatorios/nome_do_relatorio/solicitar)
     │
     ├─ validar(parametros)        → (bool, str)
     │
@@ -66,6 +66,7 @@ rota HTTP (GET /relatorios/nome_do_relatorio)
 |---|---|---|
 | `total` | int | Total de registros |
 | `periodo` | str | `"MM/YYYY"` para exibição |
+| `resumo` | str | **Consumida pelo orquestrador**: texto do WhatsApp (caption do PDF ou mensagem inteira no formato `resumo_texto`) |
 | `registros` | list[dict] | Linhas detalhadas (tabela completa) |
 | `grupos` | list[dict] | Agrupamento por categoria |
 | `top5` | list[dict] | Top 5 por valor |
@@ -77,6 +78,25 @@ rota HTTP (GET /relatorios/nome_do_relatorio)
 
 Variáveis injetadas pelo renderizador (sempre disponíveis no template):
 - `titulo`, `subtitulo`, `data_geracao`
+
+---
+
+## O que o sistema faz por você (não reimplemente)
+
+| Recurso | Como funciona |
+|---|---|
+| **Formatos de saída** | O mesmo `buscar_dados()` serve `?formato=json` (dados), `html` (página), `pdf` (download) e `base64` — você só escreve o template |
+| **Entrega automática** | `?notificar=true` → orquestrador gera o PDF, cria entregas para os destinatários e o n8n envia (WhatsApp documento/resumo, email com anexo) |
+| **Destinatários em 3 camadas** | Fixos (`relatorios_destinatarios`), extras do agendamento, criador do agendamento — resolvidos e deduplicados pelo orquestrador |
+| **`modo_execucao: por_destinatario`** | 1 execução por destinatário aplicando o `filtro_parametros` dele (ex: cada gerente recebe o PDF da filial dele) — configure no `config.json` + admin |
+| **`grupos_por_destinatario`** | Alternativa dinâmica: o próprio `buscar_dados()` retorna grupos (contrato documentado no `config.json` desta pasta) — 1 PDF filtrado por destinatário vindo da query |
+| **`formato_whatsapp`** | Por destinatário: `documento` (PDF anexo com `resumo` de caption) ou `resumo_texto` (só o texto de `resumo`) |
+| **Tokens dinâmicos** | Parâmetros com `{{hoje}}`, `{{ontem}}`, `{{mes_anterior_inicio}}`, `{{semana_atual_inicio}}`... resolvidos antes do processador (lista completa: `GET /relatorios/{nome}/config`) |
+| **Validação de contatos** | Telefones normalizados para o formato Evolution API e emails validados pelo core — destino inválido é pulado com warning |
+| **Compressão de PDF** | Ghostscript comprime o PDF antes da entrega (se instalado) |
+| **Janela de silêncio / modo teste** | Silêncio adia a entrega (`enviar_apos`); modo teste redireciona tudo para o contato de teste |
+| **Fila robusta** | Claim atômico (sem envio duplicado), retry 3× em 24h, purga de entregas antigas |
+| **Agendamento** | `POST /agendamentos` com frequência diária/semanal/mensal/intervalo, fuso por agendamento |
 
 ---
 
@@ -370,11 +390,14 @@ WHERE criado_em >= NOW() - INTERVAL '30 days'
 ## Checklist ao criar novo relatório
 
 - [ ] Renomeou a pasta (sem underscore inicial)
-- [ ] Atualizou `config.json` (titulo, categoria, parametros)
+- [ ] Atualizou `config.json` (titulo, subtitulo, categoria, modo_execucao, parametros)
 - [ ] Adaptou as 3 queries em `consultas.sql` para o domínio real
-- [ ] Renomeou a classe no `processador.py`
+- [ ] Renomeou a classe no `processador.py` (mantendo o prefixo `Processador`)
 - [ ] Ajustou `CONEXAO_ERP` e `CONEXAO_METAS` se necessário
 - [ ] Adaptou `buscar_dados()`: colunas, joins, agrupamentos, gráficos
+- [ ] Payload retorna `resumo` (texto do WhatsApp na entrega)
 - [ ] Adaptou `template.html`: campos das tabelas, colunas dos cards
-- [ ] Testou com dados reais antes de colocar em produção
+- [ ] Subiu a aplicação e conferiu o log: sem warning de contrato para a sua pasta
+- [ ] Testou `?formato=html` no navegador, depois `?formato=pdf`
+- [ ] Testou entrega com `?notificar=true` em modo teste antes de agendar
 - [ ] Verificou que `plt.close(fig)` está sendo chamado em todos os gráficos

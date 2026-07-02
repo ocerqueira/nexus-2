@@ -19,8 +19,8 @@ def admin_dashboard(request: Request):
         n_ale = c.execute(text("SELECT COUNT(*) FROM alertas WHERE status='ativo'")).scalar() or 0
         n_usr = c.execute(text("SELECT COUNT(*) FROM usuarios WHERE ativo=TRUE")).scalar() or 0
         n_age = c.execute(text("SELECT COUNT(*) FROM agendamentos WHERE ativo=TRUE")).scalar() or 0
-        n_desp_pendentes = c.execute(text("SELECT COUNT(*) FROM entregas WHERE status='pendente'")).scalar() or 0
-        n_desp_falhos = c.execute(text("SELECT COUNT(*) FROM entregas WHERE status='falho'")).scalar() or 0
+        n_desp_pendentes = c.execute(text("SELECT COUNT(*) FROM entregas WHERE status IN ('pendente', 'processando')")).scalar() or 0
+        n_desp_falhos = c.execute(text("SELECT COUNT(*) FROM entregas WHERE status='falhou'")).scalar() or 0
         rows = c.execute(text("""
             SELECT h.tipo_recurso, h.recurso_nome, h.status, h.mensagem_erro, h.criado_em,
                    u.nome AS usuario_nome
