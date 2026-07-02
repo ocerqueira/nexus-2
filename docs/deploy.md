@@ -166,7 +166,7 @@ curl -X POST http://SEU_SERVIDOR:8000/usuarios \
 Importe os três workflows em `docs/n8n/`:
 
 1. N8N → **Settings → Import workflow** → selecione `nexus_dispatcher.json` (agendamentos → chama alertas/relatórios)
-2. Repita para `nexus_despachos_sender.json` (polling de `/despachos/pendentes` → envia via Evolution/SMTP)
+2. Repita para `nexus_entregas_sender.json` (polling de `/entregas/pendentes` → envia via Evolution/SMTP)
 3. Repita para `nexus_chatbot.json` (chatbot WhatsApp sob demanda)
 4. Em cada workflow importado, edite o nó **"⚙️ Config (Edite aqui)"** com os valores reais:
 

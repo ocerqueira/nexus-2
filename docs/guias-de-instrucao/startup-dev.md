@@ -1,6 +1,6 @@
 # Guia — Startup completo do ambiente de desenvolvimento
 
-**Objetivo**: Subir o Nexus localmente do zero e validar todo o fluxo — conexões, relatórios em todos os formatos, despachos e agendamentos.
+**Objetivo**: Subir o Nexus localmente do zero e validar todo o fluxo — conexões, relatórios em todos os formatos, entregas e agendamentos.
 
 Pré-requisito: Docker instalado e rodando.
 
@@ -118,7 +118,7 @@ curl http://localhost:8099/conexoes -H "X-Api-Key: nexus-redecorp-2024"
 
 ---
 
-## 4. Criar usuário para testes de despacho
+## 4. Criar usuário para testes de entrega
 
 Despachos precisam de um usuário com `whatsapp_numero` ou `email` preenchido.
 
@@ -134,7 +134,7 @@ curl -X POST http://localhost:8099/usuarios \
   }'
 ```
 
-Anote o `id` retornado — será usado nos passos de despacho e agendamento.
+Anote o `id` retornado — será usado nos passos de entrega e agendamento.
 
 ---
 
@@ -217,9 +217,9 @@ curl -X POST "http://localhost:8099/relatorios/itens_comprimento_por_carga/solic
 
 ---
 
-## 6. Fluxo de despacho (simular o N8N)
+## 6. Fluxo de entrega (simular o N8N)
 
-O despacho é o mecanismo de entrega multicanal. O Nexus cria os registros; o N8N (ou qualquer consumidor) pollar a fila e executa o envio real.
+Entregas são o mecanismo de envio multicanal. O Nexus cria os registros; o N8N (ou qualquer consumidor) faz polling da fila — com claim atômico (status vira `processando`) — e executa o envio real.
 
 ### 6.1 Solicitar relatório com notificação
 
@@ -232,28 +232,28 @@ curl -X POST "http://localhost:8099/relatorios/teste_conexoes/solicitar?formato=
   -d '{}'
 ```
 
-A resposta inclui o bloco `"despachos"` com os registros criados:
+A resposta inclui o bloco `"entregas"` com os registros criados:
 
 ```json
 {
   "status": "sucesso",
-  "despachos": {
+  "entregas": {
     "total_destinatarios": 1,
-    "despachos": [
+    "entregas": [
       { "id": 1, "status": "pendente", "canal": "whatsapp", "destino": "5544999990001" }
     ]
   }
 }
 ```
 
-### 6.2 Pollar despachos pendentes (endpoint do N8N)
+### 6.2 Pollar entregas pendentes (endpoint do N8N)
 
 ```bash
-curl "http://localhost:8099/despachos/pendentes" \
+curl "http://localhost:8099/entregas/pendentes" \
   -H "X-Api-Key: nexus-redecorp-2024"
 ```
 
-O payload de cada despacho WhatsApp tem:
+O payload de cada entrega WhatsApp tem:
 
 ```json
 {
@@ -273,16 +273,16 @@ O N8N usa `relatorio_nome` + `GET /relatorios/{nome}/solicitar?formato=pdf` para
 
 ```bash
 # Só WhatsApp
-curl "http://localhost:8099/despachos/pendentes?canal=whatsapp" -H "X-Api-Key: nexus-redecorp-2024"
+curl "http://localhost:8099/entregas/pendentes?canal=whatsapp" -H "X-Api-Key: nexus-redecorp-2024"
 
 # Só email
-curl "http://localhost:8099/despachos/pendentes?canal=email" -H "X-Api-Key: nexus-redecorp-2024"
+curl "http://localhost:8099/entregas/pendentes?canal=email" -H "X-Api-Key: nexus-redecorp-2024"
 ```
 
 ### 6.4 Marcar como enviado (callback do N8N)
 
 ```bash
-curl -X PATCH http://localhost:8099/despachos/1/status \
+curl -X PATCH http://localhost:8099/entregas/1/status \
   -H "X-Api-Key: nexus-redecorp-2024" \
   -H "Content-Type: application/json" \
   -d '{"status": "enviado", "tentativas": 1}'
@@ -293,23 +293,23 @@ Status válidos: `enviado` | `falhou` | `confirmado` | `cancelado`
 ### 6.5 Registrar falha
 
 ```bash
-curl -X PATCH http://localhost:8099/despachos/1/status \
+curl -X PATCH http://localhost:8099/entregas/1/status \
   -H "X-Api-Key: nexus-redecorp-2024" \
   -H "Content-Type: application/json" \
   -d '{"status": "falhou", "erro": "Evolution API timeout", "tentativas": 1}'
 ```
 
-### 6.6 Consultar histórico de despachos (admin)
+### 6.6 Consultar histórico de entregas (admin)
 
 ```bash
 # Todos
-curl "http://localhost:8099/despachos" -H "X-Api-Key: nexus-redecorp-2024"
+curl "http://localhost:8099/entregas" -H "X-Api-Key: nexus-redecorp-2024"
 
 # Filtrar por status
-curl "http://localhost:8099/despachos?status=enviado" -H "X-Api-Key: nexus-redecorp-2024"
+curl "http://localhost:8099/entregas?status=enviado" -H "X-Api-Key: nexus-redecorp-2024"
 
 # Filtrar por canal + relatório
-curl "http://localhost:8099/despachos?canal=whatsapp&relatorio_nome=teste_conexoes" \
+curl "http://localhost:8099/entregas?canal=whatsapp&relatorio_nome=teste_conexoes" \
   -H "X-Api-Key: nexus-redecorp-2024"
 ```
 
@@ -396,9 +396,9 @@ Isso atualiza `ultimo_envio` e recalcula `proximo_envio` automaticamente.
 
 ## 8. Testar modo de envio por email
 
-Para despachos com canal `email`, o payload contém o PDF em base64. Primeiro configure um destinatário com email e canal `email` na tabela `relatorios_destinatarios`, ou passe `usuario_id` de um usuário com email cadastrado.
+Para entregas com canal `email`, o payload contém o PDF em base64. Primeiro configure um destinatário com email e canal `email` na tabela `relatorios_destinatarios`, ou passe `usuario_id` de um usuário com email cadastrado.
 
-O despacho gerado terá:
+A entrega gerada terá:
 
 ```json
 {

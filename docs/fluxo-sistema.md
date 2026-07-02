@@ -38,16 +38,16 @@ flowchart TD
             DE2["Dinâmicos do ERP\n(contatos_setores)"]
             DE3["Do agendamento\n(agendamentos_destinatarios)"]
         end
-        DP["Tabela despachos\nstatus = pendente"]
+        DP["Tabela entregas\nstatus = pendente"]
     end
 
-    subgraph N8N_SEND["n8n — nexus_despachos_sender"]
-        S1["GET /despachos/pendentes\n(polling a cada minuto)"]
-        S2["Loop por despacho"]
+    subgraph N8N_SEND["n8n — nexus_entregas_sender"]
+        S1["GET /entregas/pendentes\n(polling a cada minuto)"]
+        S2["Loop por entrega"]
         S3{{"canal?"}}
         S4["Evolution API\nsendMedia (PDF)\nou sendText"]
         S5["SMTP\nsendEmail"]
-        S6["PATCH /despachos/{id}/status\nstatus = enviado | falhou"]
+        S6["PATCH /entregas/{id}/status\nstatus = enviado | falhou"]
     end
 
     subgraph DEST_FINAL["Destinatários"]
@@ -101,15 +101,15 @@ sequenceDiagram
     Nexus->>Nexus: gerar_pdf() — WeasyPrint
     Nexus->>DB: buscar destinatários
     DB-->>Nexus: lista (fixos + agendamento)
-    Nexus->>DB: INSERT despachos (status=pendente)
-    Nexus-->>Trigger: {despachos: [...]}
+    Nexus->>DB: INSERT entregas (status=pendente)
+    Nexus-->>Trigger: {entregas: [...]}
 
     loop a cada minuto
-        N8N->>Nexus: GET /despachos/pendentes
+        N8N->>Nexus: GET /entregas/pendentes
         Nexus-->>N8N: [{id, canal, destino, payload}]
         N8N->>WA: sendMedia (PDF) ou sendText
         WA-->>N8N: 200 OK
-        N8N->>Nexus: PATCH /despachos/{id}/status = enviado
+        N8N->>Nexus: PATCH /entregas/{id}/status = enviado
     end
 ```
 
@@ -137,13 +137,13 @@ sequenceDiagram
         Note over Nexus: itens já notificados = ignorados
         Nexus->>DB: buscar destinatários fixos
         Nexus->>Nexus: merge fixos + dinâmicos do ERP
-        Nexus->>DB: INSERT despachos por (item × destinatário)
+        Nexus->>DB: INSERT entregas por (item × destinatário)
         Nexus->>DB: atualiza fingerprints + ultimo_disparo
-        Nexus-->>Trigger: {despachos: [...]}
+        Nexus-->>Trigger: {entregas: [...]}
     end
 
     loop a cada minuto
-        N8N->>Nexus: GET /despachos/pendentes
+        N8N->>Nexus: GET /entregas/pendentes
         N8N->>WA: sendText (mensagem individual por item)
         N8N->>Nexus: PATCH status = enviado
     end
@@ -178,15 +178,19 @@ flowchart LR
 
 ---
 
-## Estados de um despacho
+## Estados de uma entrega
 
 ```mermaid
 stateDiagram-v2
     [*] --> pendente: INSERT (Nexus)
-    pendente --> enviado: n8n entregou com sucesso
-    pendente --> falhou: Evolution/SMTP retornou erro
-    falhou --> pendente: retry automático (tentativas < 3, < 24h)
+    pendente --> processando: claim atômico (GET /entregas/pendentes)
+    processando --> enviado: n8n entregou com sucesso
+    processando --> falhou: Evolution/SMTP retornou erro
+    processando --> processando: travada >15min → re-claim (incluir_retry)
+    falhou --> processando: retry automático (tentativas < 3, < 24h)
     enviado --> confirmado: confirmação de leitura (futuro)
     pendente --> cancelado: cancelamento manual
     falhou --> cancelado: tentativas esgotadas ou manual
 ```
+
+O claim (`pendente → processando`) acontece na própria consulta de polling, com `FOR UPDATE SKIP LOCKED` — dois pollers simultâneos nunca recebem a mesma entrega. Entregas em status terminal são purgadas por `DELETE /entregas/antigas` (cron diário no n8n).

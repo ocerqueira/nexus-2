@@ -4,7 +4,7 @@ Guias de instrução são orientados a problemas. Cada um resolve uma tarefa esp
 
 ## Guias disponíveis
 
-- [Startup completo do ambiente dev](startup-dev.md) — Suba tudo do zero e valide o ciclo completo: conexões, relatórios, despachos e agendamentos
+- [Startup completo do ambiente dev](startup-dev.md) — Suba tudo do zero e valide o ciclo completo: conexões, relatórios, entregas e agendamentos
 - [Adicionar uma conexão de banco externo](adicionar-conexao.md) — Cadastre uma nova conexão PostgreSQL, Firebird ou MySQL no catálogo
 - [Gerar um relatório em PDF](gerar-relatorio-pdf.md) — Solicite um relatório via API e receba o PDF
 - [Configurar agendamento de alerta](configurar-agendamento.md) — Defina frequência, horários e destinatários para um alerta

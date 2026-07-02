@@ -43,7 +43,7 @@ Relatórios e alertas são arquivos. Eles vivem no Git junto com o código. Um p
 
 ### 2. Criação sem tocar código existente
 
-Exceto pelo registro no dicionário `PROCESSADORES` (um mapa de 3 linhas), criar um relatório não modifica nenhum arquivo do core. O orquestrador, o renderizador, as rotas — nada disso muda.
+Criar um relatório não modifica **nenhum** arquivo do core. O processador é descoberto automaticamente pela convenção de nome (classe `Processador*` em `processador.py`, via `app/core/processadores.py`). O orquestrador, o renderizador, as rotas — nada disso muda.
 
 ### 3. Remoção segura
 
@@ -55,9 +55,9 @@ Não há necessidade de rodar migrations. O `POST /sincronizar` reflete mudança
 
 ## Limitações
 
-### Registro manual no dicionário
+### Contrato validado só por convenção
 
-O processador Python ainda precisa ser importado e registrado no dicionário `PROCESSADORES` da rota correspondente. Isso é uma limitação intencional: o Python não tem um mecanismo de autodiscovery seguro e embutido como o de plugins. A alternativa seria usar `importlib` para carregar módulos dinamicamente, mas isso introduz riscos de segurança e complexidade.
+A descoberta usa `importlib` + convenção de nome: a classe em `processador.py` precisa começar com `Processador` e implementar o contrato (`validar` + `buscar_dados` para relatórios, `validar` + `verificar` para alertas). Nada disso é imposto pelo Python em si — por isso o sincronizador verifica o contrato de cada pasta **no startup** e loga um *warning* para pastas quebradas, em vez de o erro só aparecer no primeiro disparo.
 
 ### Inicialização bloqueante
 
@@ -67,7 +67,7 @@ A sincronização acontece no startup da aplicação. Se houver centenas de past
 
 | Abordagem | Adicionar relatório | Versionamento | Remoção segura |
 |-----------|---------------------|---------------|----------------|
-| **Nexus (filesystem)** | Criar pasta + 3 linhas no dicionário | Git (arquivos) | Status `removido` |
+| **Nexus (filesystem)** | Criar pasta (descoberta automática) | Git (arquivos) | Status `removido` |
 | API dinâmica (upload) | Upload de arquivos | Precisa de sistema externo | Manual |
 | Tudo no banco | SQL + migration | Precisa versionar migrations | Soft delete |
 | Código hardcoded | Editar switch/rotas | Git (código) | Reverter código |

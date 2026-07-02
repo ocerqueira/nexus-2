@@ -108,6 +108,10 @@ POST /alertas/{nome}/verificar?forcar=false
 | `app/core/inicializador.py` | Executa arquivos SQL de estrutura do banco |
 | `app/core/autenticacao.py` | Middleware de autenticação API Key |
 | `app/core/orquestrador_alertas.py` | Pipeline completo de verificação de alerta |
+| `app/core/orquestrador_relatorios.py` | Pipeline de geração + entrega de relatórios |
+| `app/core/entregas_comum.py` | Helpers compartilhados: modo teste, janela de silêncio, validação de contatos (WhatsApp/email), inserção de entregas |
+| `app/core/processadores.py` | Descoberta automática de processadores + verificação de contrato no startup |
+| `app/core/resolvedor_parametros.py` | Resolução de tokens dinâmicos ({{hoje}}, {{mes_anterior_inicio}}, ...) |
 | `app/core/renderizador.py` | Renderização HTML e geração PDF de relatórios |
 | `app/core/renderizador_mensagens.py` | Renderização de mensagens de alerta (Jinja2 por canal) |
 | `app/core/calculadora_agenda.py` | Cálculo de próximas execuções de agendamentos |

@@ -151,16 +151,16 @@ Executa a verificação de um alerta.
   "resumo": "3 itens com comprimento excedente",
   "total_encontrado": 3,
   "itens_notificados": 3,
-  "despachos": [
+  "entregas": [
     {"id": 1, "status": "pendente", "canal": "whatsapp", "destino": "5511999999999", "destinatario": "João Vendedor", "enviar_apos": null},
     {"id": 2, "status": "pendente", "canal": "whatsapp", "destino": "5511988888888", "destinatario": "Maria Assistente", "enviar_apos": null}
   ],
-  "despachos_bloqueados_rate_limit": 0,
+  "entregas_bloqueados_rate_limit": 0,
   "historico_id": 42
 }
 ```
 
-Os despachos são inseridos na tabela `despachos` com `status=pendente`. O workflow `nexus_despachos_sender` no n8n faz polling em `/despachos/pendentes` e executa a entrega.
+As entregas são inseridas na tabela `entregas` com `status=pendente`. O workflow `nexus_entregas_sender` no n8n faz polling em `/entregas/pendentes` e executa a entrega.
 
 **Resposta (em cooldown)**:
 ```json
@@ -187,13 +187,13 @@ Os despachos são inseridos na tabela `despachos` com `status=pendente`. O workf
 | Campo | Descrição |
 |-------|-----------|
 | `alerta` | Dados básicos do alerta (id, nome, título, severidade) |
-| `deve_notificar` | `true` se despachos pendentes foram criados |
+| `deve_notificar` | `true` se entregas pendentes foram criadas |
 | `motivo` | Se `deve_notificar=false`, explica o motivo |
 | `resumo` | Texto curto descritivo do resultado |
 | `total_encontrado` | Total de itens retornados pelo processador |
 | `itens_notificados` | Itens que passaram pelo filtro de cooldown/dedup |
-| `despachos` | Array de despachos pendentes criados (id, canal, destino, destinatario, enviar_apos) |
-| `despachos_bloqueados_rate_limit` | Despachos bloqueados por rate limit (auditável) |
+| `entregas` | Array de entregas pendentes criadas (id, canal, destino, destinatario, enviar_apos) |
+| `entregas_bloqueadas_rate_limit` | Entregas bloqueadas por rate limit (auditável) |
 | `historico_id` | ID do registro de auditoria em `historico` |
 
 **Erros**:
@@ -216,32 +216,38 @@ Os despachos são inseridos na tabela `despachos` com `status=pendente`. O workf
 
 ---
 
-## Despachos
+## Entregas
 
-Unidades rastreáveis de entrega. Criados internamente pelo Nexus ao verificar alertas ou solicitar relatórios com `notificar=true`. O workflow `nexus_despachos_sender` no n8n faz polling e executa o envio.
+Unidades rastreáveis de envio. Criadas internamente pelo Nexus ao verificar alertas ou solicitar relatórios com `notificar=true`. O workflow `nexus_entregas_sender` no n8n faz polling e executa o envio.
 
-### `GET /despachos/pendentes`
+Ciclo de vida: `pendente → processando → enviado → confirmado`, com desvios para `falhou`, `cancelado` e `bloqueado_rate_limit`.
 
-Retorna despachos com `status=pendente` e `enviar_apos IS NULL OR enviar_apos <= NOW()`. Endpoint principal do n8n sender.
+### `GET /entregas/pendentes`
+
+Retorna entregas prontas para envio e faz **claim atômico** de cada uma: o status muda para `processando` na mesma transação (`FOR UPDATE SKIP LOCKED`). Duas chamadas simultâneas nunca recebem a mesma entrega — sem risco de envio duplicado.
+
+Seleciona: `status=pendente` com `enviar_apos IS NULL OR enviar_apos <= NOW()`. Endpoint principal do n8n sender.
 
 **Query parameters**:
 
 | Parâmetro | Tipo | Descrição |
 |-----------|------|-----------|
 | `canal` | string | Filtrar por canal (`whatsapp`, `email`) |
-| `limite` | integer | Máximo de registros retornados (padrão: 50) |
+| `limite` | integer | Máximo de registros retornados (padrão: 50, máx: 200) |
+| `incluir_retry` | boolean | Se `true`, também re-fila: `falhou` com `tentativas < 3` nas últimas 24h, e `processando` travadas há mais de 15 min (n8n caiu antes do callback) |
 
-**Resposta**:
+**Resposta** (campo `status_atual` mostra o status *antes* do claim):
 ```json
 {
   "total": 2,
-  "despachos": [
+  "entregas": [
     {
       "id": 1,
       "canal": "whatsapp",
       "destino": "5511999999999",
       "payload": {"mensagem": "⚠️ Item X com comprimento excedente"},
-      "alerta_id": 1,
+      "status_atual": "pendente",
+      "alerta_nome": "item_comprimento_excedente",
       "relatorio_nome": null,
       "tentativas": 0
     }
@@ -249,13 +255,13 @@ Retorna despachos com `status=pendente` e `enviar_apos IS NULL OR enviar_apos <=
 }
 ```
 
-### `GET /despachos`
+### `GET /entregas`
 
-Lista histórico de despachos com filtros.
+Lista histórico de entregas com filtros e paginação (admin panel).
 
-**Query parameters**: `status`, `canal`, `alerta_id`, `relatorio_nome`, `limite`, `offset`.
+**Query parameters**: `status`, `canal`, `alerta_nome`, `relatorio_nome`, `pagina`, `por_pagina`.
 
-### `PATCH /despachos/{id}/status`
+### `PATCH /entregas/{id}/status`
 
 Callback do n8n após tentativa de envio.
 
@@ -270,7 +276,17 @@ Callback do n8n após tentativa de envio.
 
 Status válidos: `enviado` | `falhou` | `confirmado` | `cancelado`.
 
-Despachos com `status=falhou` e `tentativas < 3` voltam automaticamente para `pendente` no próximo polling.
+Entregas com `status=falhou` e `tentativas < 3` voltam automaticamente à fila no próximo polling com `incluir_retry=true`.
+
+### `DELETE /entregas/antigas`
+
+Purga entregas em status terminal (`enviado`, `confirmado`, `cancelado`, `falhou`, `bloqueado_rate_limit`) criadas há mais de `dias` dias. Os payloads carregam PDFs em base64 — sem purga a tabela cresce sem limite. O `historico` é preservado.
+
+**Query parameters**: `dias` (padrão: 30).
+
+**Resposta**: `{"removidas": 128, "dias": 30}`
+
+Agendar via cron do n8n (ex: 1x por dia).
 
 ---
 

@@ -144,22 +144,12 @@ class ProcessadorResumoUsuarios:
 {% endblock %}
 ```
 
-## 6. Registre em `app/rotas/relatorios.py`
+## 6. Sincronize e teste
 
-```python
-from app.relatorios.resumo_usuarios.processador import ProcessadorResumoUsuarios
-
-PROCESSADORES = {
-    # ... existentes ...
-    "resumo_usuarios": {
-        "classe": ProcessadorResumoUsuarios,
-        "titulo": "Resumo de Usuários",
-        "subtitulo": "Usuários cadastrados no sistema",
-    },
-}
-```
-
-## 7. Sincronize e teste
+Não há registro manual — a classe `ProcessadorResumoUsuarios` é descoberta
+automaticamente pela convenção de nome (`Processador*` em `processador.py`).
+Título e subtítulo vêm do `config.json`. O contrato (`validar` + `buscar_dados`)
+é conferido no startup; pasta quebrada gera *warning* no log.
 
 ```bash
 curl -X POST http://localhost:8000/sincronizar
@@ -426,7 +416,7 @@ def buscar_dados(parametros: dict) -> dict:
 | `processador.py` | `validar()` + `buscar_dados()` |
 | `template.html` | Jinja2 `{% extends "base.html" %}` |
 
-Registrar em `PROCESSADORES` em `app/rotas/relatorios.py` é o único toque em código existente.
+Nenhum toque em código existente — a descoberta do processador é automática.
 Chamar `POST /sincronizar` após criar a pasta faz o banco reconhecer o novo relatório.
 
 **Padrão de data a escolher:**

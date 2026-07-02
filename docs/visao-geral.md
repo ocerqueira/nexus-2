@@ -31,14 +31,14 @@ O sistema tem três responsabilidades centrais:
 - Deduplica por fingerprint: o mesmo item só dispara uma vez por janela de cooldown
 
 ### Rastreabilidade
-- Toda entrega gera um **despacho** com status rastreado: `pendente → enviado → confirmado | falhou`
+- Todo envio gera uma **entrega** com status rastreado: `pendente → processando → enviado → confirmado | falhou`
 - Retry automático para falhas transitórias (até 3 tentativas em 24h)
 - Histórico completo de execuções com parâmetros e resultado
 
 ### Admin Panel
 - Interface web para cadastrar usuários, conexões, agendamentos e destinatários
 - Disparo manual de relatórios e alertas
-- Visualização de despachos pendentes, enviados e falhos
+- Visualização de entregas pendentes, enviadas e falhas
 
 ---
 
@@ -51,11 +51,11 @@ Novos relatórios e alertas são criados adicionando uma pasta em `app/relatorio
 
 ---
 
-### Despachos como unidade de entrega
-O Nexus não envia mensagens diretamente. Ele produz **despachos** — registros no banco com destinatário, canal e payload serializado. O n8n consome esses despachos via polling e faz a entrega via Evolution API (WhatsApp) ou SMTP.
+### Entregas como unidade de envio
+O Nexus não envia mensagens diretamente. Ele produz **entregas** — registros no banco com destinatário, canal e payload serializado. O n8n consome essas entregas via polling e faz o envio via Evolution API (WhatsApp) ou SMTP.
 
 ```
-Nexus cria → despacho → n8n entrega → Nexus confirma
+Nexus cria a entrega → n8n envia → Nexus confirma
 ```
 
 **Por quê:** desacopla a lógica de negócio (quem recebe o quê) da infraestrutura de envio (qual API de WhatsApp, qual SMTP). Trocar de provedor não afeta o Nexus.
@@ -64,9 +64,9 @@ Nexus cria → despacho → n8n entrega → Nexus confirma
 
 ### n8n é agnóstico
 O n8n não sabe nada sobre relatórios, alertas ou destinatários. Ele apenas:
-- Faz GET em `/despachos/pendentes`
+- Faz GET em `/entregas/pendentes`
 - Envia cada item pelo canal indicado
-- Faz PATCH em `/despachos/{id}/status`
+- Faz PATCH em `/entregas/{id}/status`
 
 Toda a lógica de negócio fica no Nexus.
 
@@ -94,7 +94,7 @@ Alertas usam SHA256 do conteúdo do item como fingerprint. Se o mesmo item já f
 ---
 
 ### Janela de silêncio por usuário
-Cada usuário pode ter um horário de silêncio configurado (ex: não perturbar entre 22h e 07h). Despachos criados dentro dessa janela ficam com `enviar_apos` preenchido e são entregues após o horário permitido.
+Cada usuário pode ter um horário de silêncio configurado (ex: não perturbar entre 22h e 07h). Entregas criadas dentro dessa janela ficam com `enviar_apos` preenchido e são enviadas após o horário permitido.
 
 ---
 
@@ -105,7 +105,7 @@ Cada usuário pode ter um horário de silêncio configurado (ex: não perturbar 
 | Multi-banco (Firebird, PostgreSQL, MySQL) | ✅ |
 | Relatórios PDF com WeasyPrint | ✅ |
 | Alertas com dedup por fingerprint | ✅ |
-| Despachos rastreáveis com retry | ✅ |
+| Entregas rastreáveis com retry e claim atômico | ✅ |
 | Envio WhatsApp via Evolution API | ✅ |
 | Envio por e-mail via SMTP | ✅ |
 | Agendamentos com cron e tokens dinâmicos | ✅ |

@@ -154,7 +154,7 @@ Alertas disponíveis (ver `/alertas`):
 - `conexoes_inativas`
 - `item_comprimento_excedente`
 
-Resposta inclui `deve_notificar: true/false` e lista de despachos criados.
+Resposta inclui `deve_notificar: true/false` e lista de entregas criados.
 
 ---
 

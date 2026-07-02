@@ -93,6 +93,8 @@ Content-Type: application/json
 "horarios": [{"hora": 8, "minuto": 0}, {"hora": 18, "minuto": 0}]
 ```
 
+**Fuso horário:** os `horarios` são interpretados no `timezone` do agendamento (default `America/Sao_Paulo`). Agendou 08:00 → dispara às 08:00 de São Paulo. O banco grava `proximo_envio` em UTC (verá 11:00 no SQL direto — mesmo instante); as respostas da API já convertem de volta pro fuso do agendamento. Detalhes: [Configurar agendamento §3](configurar-agendamento.md).
+
 **Parâmetros com tokens dinâmicos:**
 ```json
 "parametros": {

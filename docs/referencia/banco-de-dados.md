@@ -21,7 +21,7 @@ alertas ── alertas_destinatarios (N-N)  ────────────
 │                                                                │
 agendamentos ── agendamentos_destinatarios (N-N)                 │
 │                                                                │
-despachos ── (alerta_id | relatorio_id | usuario_id)             │
+entregas ── (alerta_id | relatorio_id | usuario_id)             │
 │                                                                │
 historico ───────────────────────────────────────────────────────┤
 │                                                                │
@@ -57,7 +57,7 @@ Usuários do sistema. Suporta três origens de cadastro: manual, WhatsApp e sinc
 | `ultimo_sync` | TIMESTAMPTZ | Última sincronização AD (nullable) |
 | `silencio_inicio` | TIME | Início da janela de silêncio (ex: `22:00`) — nullable |
 | `silencio_fim` | TIME | Fim da janela de silêncio (ex: `06:00`) — suporta cruzamento de meia-noite |
-| `silencio_ativo` | BOOLEAN | Se TRUE, despachos criados na janela recebem `enviar_apos` |
+| `silencio_ativo` | BOOLEAN | Se TRUE, entregas criados na janela recebem `enviar_apos` |
 | `criado_em` | TIMESTAMPTZ | Data de criação |
 | `atualizado_em` | TIMESTAMPTZ | Atualizado automaticamente por trigger |
 
@@ -142,7 +142,7 @@ Catálogo de alertas. Sincronizado automaticamente com `app/alertas/*`.
 | `severidade` | VARCHAR(20) | `info`, `aviso`, `critico` |
 | `status` | VARCHAR(20) | `ativo`, `inativo` ou `removido` |
 | `cooldown_minutos` | INTEGER | Cooldown global entre disparos (padrão: 60). Operado por item via `alertas_itens_notificados`. |
-| `ultimo_disparo` | TIMESTAMPTZ | Timestamp do último despacho criado (qualquer item) |
+| `ultimo_disparo` | TIMESTAMPTZ | Timestamp do última entrega criada (qualquer item) |
 | `ultimo_sync` | TIMESTAMPTZ | Última sincronização |
 | `removido_em` | TIMESTAMPTZ | Quando foi marcado como removido |
 | `criado_em` | TIMESTAMPTZ | Data de criação |
@@ -167,8 +167,8 @@ Destinatários fixos por alerta — substitui `alertas_condicoes`. Configurado p
 | `usuario_id` | INTEGER FK → usuarios | Destinatário (incluindo `origem='externo'`) |
 | `canais` | TEXT[] | `{whatsapp,email}` |
 | `modo_mensagem` | VARCHAR(20) | `individual` (1 msg/item) \| `agrupado` (resumo geral) |
-| `limite_hora` | INTEGER | Max despachos/hora — NULL = sem limite |
-| `limite_dia` | INTEGER | Max despachos/dia — NULL = sem limite |
+| `limite_hora` | INTEGER | Max entregas/hora — NULL = sem limite |
+| `limite_dia` | INTEGER | Max entregas/dia — NULL = sem limite |
 | `ativo` | BOOLEAN | `TRUE` por padrão |
 | `criado_em` | TIMESTAMPTZ | Data de criação |
 
@@ -219,24 +219,25 @@ Fingerprint por item para cooldown granular — evita re-notificar o mesmo item 
 
 ---
 
-### `despachos`
+### `entregas`
 
-Unidade mínima rastreável de entrega. Criada pelo orquestrador de alertas ou relatórios; consumida pelo `nexus_despachos_sender` no n8n.
+Unidade mínima rastreável de entrega. Criada pelo orquestrador de alertas ou relatórios; consumida pelo `nexus_entregas_sender` no n8n.
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
 | `id` | SERIAL PK | Identificador único |
-| `historico_id` | INTEGER FK → historico | Execução que originou o despacho |
+| `historico_id` | INTEGER FK → historico | Execução que originou a entrega |
 | `alerta_id` | INTEGER FK → alertas | Alerta de origem (nullable) |
 | `relatorio_id` | INTEGER FK → relatorios | Relatório de origem (nullable) |
 | `usuario_id` | INTEGER FK → usuarios | Destinatário (nullable para externos) |
 | `canal` | VARCHAR(20) | `whatsapp` \| `email` \| `sms` |
 | `destino` | VARCHAR(255) | Número ou e-mail de destino |
 | `payload` | JSONB | `{mensagem}` para texto \| `{assunto,html}` para email \| `{documento_base64,...}` para PDF |
-| `status` | VARCHAR(30) | `pendente` → `enviado` → `confirmado` \| `falhou` \| `bloqueado_rate_limit` \| `cancelado` |
+| `status` | VARCHAR(30) | `pendente` → `processando` → `enviado` → `confirmado` \| `falhou` \| `bloqueado_rate_limit` \| `cancelado` |
 | `tentativas` | INTEGER | Contador de tentativas de envio |
-| `erro` | TEXT | Mensagem de erro da última tentativa |
+| `ultimo_erro` | TEXT | Mensagem de erro da última tentativa |
 | `enviar_apos` | TIMESTAMPTZ | NULL = enviar agora. Preenchido por janela de silêncio. |
+| `processando_em` | TIMESTAMPTZ | Quando o n8n fez claim (`GET /entregas/pendentes`). Entregas travadas em `processando` há +15 min voltam à fila via `incluir_retry=true`. |
 | `acao_requerida` | BOOLEAN | TRUE = destinatário deve confirmar (escalação futura) |
 | `escalado_para` | INTEGER FK → usuarios | Para quem escalar se prazo expirar |
 | `criado_em` | TIMESTAMPTZ | Data de criação |
@@ -380,5 +381,7 @@ Trigger genérica aplicada a todas as tabelas com coluna `atualizado_em`. Atuali
 | `banco/002_chatbot_sessoes.sql` | Tabela `chatbot_sessoes` |
 | `banco/003_timezone_agendamentos.sql` | Coluna `timezone` em `agendamentos` |
 | `banco/004_agendamentos_intervalo.sql` | Frequência `intervalo` com `intervalo_minutos` em `agendamentos` |
-| `banco/005_dispatch_refactor.sql` | Dispatch layer: `despachos`, `alertas_destinatarios`, `relatorios_destinatarios`, `agendamentos_destinatarios`, `alertas_itens_notificados`. Colunas `cooldown_minutos`/`ultimo_disparo` em `alertas`, `modo_execucao` em `relatorios`, `silencio_*` em `usuarios` |
+| `banco/005_dispatch_refactor.sql` | Dispatch layer: tabela `despachos` (renomeada para `entregas` na 006), `alertas_destinatarios`, `relatorios_destinatarios`, `agendamentos_destinatarios`, `alertas_itens_notificados`. Colunas `cooldown_minutos`/`ultimo_disparo` em `alertas`, `modo_execucao` em `relatorios`, `silencio_*` em `usuarios` |
 | `banco/005b_migrar_alertas_condicoes.sql` | Migra dados de `alertas_condicoes` para as novas tabelas e prepara DROP |
+| `banco/006_rename_despachos_entregas.sql` | Renomeia tabela `despachos` → `entregas` (índices e sequence junto) |
+| `banco/007_entregas_processando.sql` | Status `processando` + coluna `processando_em` em `entregas` (claim atômico do polling) |

@@ -38,19 +38,16 @@ O dict de retorno deve conter pelo menos:
 - `total`: número de registros (usado nos cards de resumo)
 - Uma chave com a lista de dados (ex: `conexoes`, `usuarios`)
 
-### Registro
+### Registro — automático
 
-O processador deve ser registrado no dicionário `PROCESSADORES` em `app/rotas/relatorios.py`:
+Não há registro manual. O Nexus descobre o processador pela convenção:
 
-```python
-PROCESSADORES = {
-    "nome_do_relatorio": {
-        "classe": MinhaClasseProcessador,
-        "titulo": "Título Visível",
-        "subtitulo": "Subtítulo opcional",
-    },
-}
-```
+1. Pasta `app/relatorios/{nome}/` com `config.json` e `processador.py`
+2. Dentro do `processador.py`, uma classe cujo nome **começa com `Processador`** (ex: `ProcessadorPedidosPorVendedor`)
+
+A descoberta é feita por `app/core/processadores.py` (`carregar_processador`). Título e subtítulo vêm do `config.json`.
+
+No startup, o sincronizador valida o contrato de cada pasta (classe existe? tem `validar` + `buscar_dados`?) e loga um *warning* para pastas quebradas — o erro aparece no boot, não no primeiro disparo.
 
 ---
 
@@ -103,25 +100,33 @@ return {
 
 | Campo | Efeito quando presente |
 |---|---|
-| `fingerprint` | Orquestrador compara com último `hash_arquivo` no `historico`. Se igual → `motivo: dados_sem_alteracao`, não notifica. |
+| `fingerprint` | Salvo em `historico.hash_arquivo` para auditoria. A deduplicação real é **por item**: o orquestrador calcula SHA256 de cada linha de `dados` e controla cooldown em `alertas_itens_notificados`. |
 | `contatos_setores` | Mesclados nos destinatários da notificação. Duplicatas por WhatsApp são removidas. |
+| `grupos_por_destinatario` | Cada grupo `{destinatario: {...}, itens: [...]}` vira um destinatário dinâmico que recebe apenas os itens do seu grupo. |
 | Qualquer outro | Disponível no contexto dos templates Jinja2 via `{{ campo }}`. |
 
 Se `encontrou_dados` for `False`, o orquestrador não renderiza mensagens nem notifica — retorna `motivo: sem_dados`.
 
-### Registro
+### Registro — automático
 
-O processador deve ser registrado no dicionário `PROCESSADORES` em `app/rotas/alertas.py`:
+Igual aos relatórios: pasta em `app/alertas/{nome}/` + classe `Processador*` em `processador.py`. Contrato exigido: `validar(parametros)` + `verificar(parametros)`. O sincronizador valida no startup e loga *warning* se a pasta estiver quebrada.
+
+---
+
+## Validação de contatos (core)
+
+Telefones e emails que entram na fila de entregas são **validados pelo core** (`app/core/entregas_comum.py`) — destino inválido gera *warning* no log e a entrega daquele canal é pulada:
 
 ```python
-from app.alertas.conexoes_inativas.processador import ProcessadorConexoesInativas
+from app.core.entregas_comum import normalizar_whatsapp, validar_email
 
-PROCESSADORES = {
-    "conexoes_inativas": ProcessadorConexoesInativas,
-}
+normalizar_whatsapp("+55 (17) 99999-0000")  # → "5517999990000"
+normalizar_whatsapp("17 99999-0000")        # → "5517999990000" (DDI 55 adicionado)
+normalizar_whatsapp("999")                  # → None (inválido)
+validar_email("  Joao@Empresa.COM ")        # → "joao@empresa.com"
 ```
 
-Diferente dos relatórios, o valor é a classe diretamente (não um dict com metadados). Os metadados vêm do `config.json` e do banco.
+`normalizar_whatsapp` aceita formatos variados (com máscara, DDI, prefixo 0) e devolve o formato exigido pela Evolution API: só dígitos com DDI 55 (12-13 dígitos). Use no processador ao extrair telefones do ERP para `contatos_setores` — o core valida de novo na entrega, mas normalizar cedo evita perder o destinatário por dedup errado.
 
 ---
 
@@ -156,29 +161,6 @@ app/
 
 ### Relatórios
 
-#### `teste_conexoes`
-- **Classe**: `ProcessadorTesteConexoes`
-- **Conexão**: `nexus_proprio` (banco interno)
-- **Parâmetros**: `apenas_ativas` (bool), `tipo_banco` (string)
-
-#### `dashboard_conexoes`
-- **Classe**: `ProcessadorDashboardConexoes`
-- **Conexão**: `nexus_proprio` (banco interno)
-- **Parâmetros**: `apenas_ativas` (bool), `tipo_banco` (string)
-- **Output**: gráficos (barras agrupadas + pizza/donut) com matplotlib, tabela de conexões
-
-#### `desempenho_vendas`
-- **Classe**: `ProcessadorDesempenhoVendas`
-- **Conexão**: `REPLICA_TERRA` (Firebird — vendas) + `testes` (PostgreSQL — metas)
-- **Parâmetros**: `cod_empresa` (int, padrão 1), `ano` (int, padrão 2026), `mes` (int, padrão 7)
-- **Output**: gráfico vendas vs meta, gráfico de tendência diária, ranking de vendedores
-
-#### `pedidos_por_vendedor`
-- **Classe**: `ProcessadorPedidosPorVendedor`
-- **Conexão**: `REPLICA_TERRA` (Firebird)
-- **Parâmetros**: `data_inicio` (obrigatório), `data_fim` (obrigatório), `cod_empresa` (padrão 1)
-- **Output**: ranking de vendedores com ticket médio, gráfico horizontal top 15, top 5 produtos por vendedor
-
 #### `itens_comprimento_por_carga`
 - **Classe**: `ProcessadorItensComprimentoPorCarga`
 - **Conexão**: `REPLICA_TERRA` (Firebird)
@@ -189,11 +171,6 @@ app/
 ---
 
 ### Alertas
-
-#### `conexoes_inativas`
-- **Classe**: `ProcessadorConexoesInativas`
-- **Conexão**: `nexus_proprio`
-- **Parâmetros**: `incluir_observacoes` (bool, padrão `false`)
 
 #### `item_comprimento_excedente`
 - **Classe**: `ProcessadorItemComprimentoExcedente`

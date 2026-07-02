@@ -136,19 +136,12 @@ class ProcessadorConexoesSemGrupo:
 </body></html>
 ```
 
-## 6. Registre em `app/rotas/alertas.py`
+## 6. Sincronize e teste
 
-```python
-from app.alertas.conexoes_sem_grupo.processador import ProcessadorConexoesSemGrupo
-
-PROCESSADORES = {
-    "conexoes_inativas": ProcessadorConexoesInativas,
-    "item_comprimento_excedente": ProcessadorItemComprimentoExcedente,
-    "conexoes_sem_grupo": ProcessadorConexoesSemGrupo,
-}
-```
-
-## 7. Sincronize e teste
+Não há registro manual — a classe `ProcessadorConexoesSemGrupo` é descoberta
+automaticamente pela convenção de nome (`Processador*` em `processador.py`).
+O contrato (`validar` + `verificar`) é conferido no startup; pasta quebrada
+gera *warning* no log.
 
 ```bash
 curl -X POST http://localhost:8000/sincronizar

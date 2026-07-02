@@ -326,15 +326,16 @@ def verificar_alerta(
     requisicao: RequisicaoAlerta | None = None,     # body (opcional)
     forcar: bool = Query(False),                    # query param
 ):
-    # 3. Validação de entrada
-    if nome_alerta not in PROCESSADORES:
+    # 3. Descoberta automática do processador (convenção Processador* na pasta)
+    processador_classe = carregar_processador("alerta", nome_alerta)
+    if not processador_classe:
         raise HTTPException(status_code=404, detail=f"Alerta '{nome_alerta}' não encontrado")
 
     parametros = requisicao.parametros if requisicao else {}
 
     # 4. Busca dados no banco (via orquestrador)
     try:
-        return orquestrar_alerta(nome_alerta, parametros, PROCESSADORES[nome_alerta], forcar)
+        return orquestrar_alerta(nome_alerta, parametros, processador_classe, forcar)
     except AlertaNaoEncontrado as erro:
         raise HTTPException(status_code=404, detail=str(erro))
 

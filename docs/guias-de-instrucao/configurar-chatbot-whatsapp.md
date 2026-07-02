@@ -7,7 +7,7 @@ Ativa o chatbot interativo para que usuários consultem relatórios e alertas pe
 ## Pré-requisitos
 
 - Evolution API rodando com uma instância conectada (QR escaneado)
-- n8n configurado com o `nexus_despachos_sender` já ativo
+- n8n configurado com o `nexus_entregas_sender` já ativo
 - Nexus rodando e acessível pela rede do n8n
 - Variáveis de ambiente do n8n disponíveis (`$env.*`)
 

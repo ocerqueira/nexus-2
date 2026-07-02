@@ -1,118 +1,101 @@
-# Guia — Configurar agendamento de alerta
+# Guia — Configurar agendamento
 
-**Problema**: Você precisa configurar quando e para quem um alerta deve ser enviado — frequência, horários, canais e destinatários.
+**Problema**: Você precisa configurar quando e para quem um relatório ou alerta deve ser enviado — frequência, horários, canais e destinatários.
 
 ---
 
-## 1. Entenda a tabela de condições
+## 1. Os dois eixos: quem recebe × quando roda
 
-Cada alerta pode ter uma ou mais **condições** na tabela `alertas_condicoes`. Cada condição define:
+São configurações independentes:
 
-| Campo | Descrição |
-|-------|-----------|
-| `alerta_id` | Qual alerta esta condição pertence |
-| `nome` | Nome descritivo da condição (ex: "Plantão diurno") |
-| `destinatarios` | JSONB com `[{"usuario_id": 1}, {"usuario_id": 2}]` ou `[{"email": "extra@exemplo.com"}]` |
-| `canais` | Array: `{whatsapp, email}` |
-| `cooldown_minutos` | Tempo mínimo entre disparos |
-| `ativo` | `TRUE` = ativa, `FALSE` = pausada |
+| Eixo | Onde configura | Tabela |
+|------|----------------|--------|
+| **Quem recebe** (fixos) | Admin Panel → Alertas/Relatórios → Destinatários | `alertas_destinatarios` / `relatorios_destinatarios` |
+| **Quem recebe** (dinâmicos) | No processador, extraído do ERP (`contatos_setores`) | — (runtime) |
+| **Quando roda** | Admin Panel → Agendamentos, ou `POST /agendamentos` | `agendamentos` |
 
-## 2. Crie uma condição para o alerta
+O agendamento dispara a execução; o orquestrador resolve os destinatários na hora (fixos + extras do agendamento + criador do agendamento).
 
-Exemplo: configurar o alerta `conexoes_inativas` para notificar dois usuários por e-mail, com cooldown de 60 minutos:
-
-```sql
-INSERT INTO alertas_condicoes (alerta_id, nome, destinatarios, canais, cooldown_minutos)
-SELECT
-  a.id,
-  'Notificar equipe de infra',
-  '[{"usuario_id": 1}, {"usuario_id": 2}]'::jsonb,
-  ARRAY['email'],
-  60
-FROM alertas a
-WHERE a.nome = 'conexoes_inativas';
-```
-
-## 3. Crie uma condição com múltiplos canais
-
-Condição que notifica por e-mail e WhatsApp:
-
-```sql
-INSERT INTO alertas_condicoes (alerta_id, nome, destinatarios, canais, cooldown_minutos)
-SELECT
-  a.id,
-  'Notificar geral',
-  '[{"usuario_id": 1}]'::jsonb,
-  ARRAY['email', 'whatsapp'],
-  120
-FROM alertas a
-WHERE a.nome = 'conexoes_inativas';
-```
-
-## 4. Destinatários fixos vs. dinâmicos
-
-O Nexus suporta dois tipos de destinatários:
-
-### Fixos (tabela `usuarios`)
-
-Referenciados por `usuario_id`. O sistema busca automaticamente nome, e-mail e WhatsApp:
-
-```json
-[{"usuario_id": 1}, {"usuario_id": 3}]
-```
-
-### Externos (e-mail direto)
-
-Para destinatários que não estão cadastrados no Nexus:
-
-```json
-[{"email": "alerta@empresa.com"}]
-```
-
-## 5. Entenda o cooldown
-
-O cooldown evita spam. Se um alerta disparou às 10:00 com cooldown de 60 minutos, ele não disparará novamente até as 11:00, mesmo que a condição ainda seja verdadeira.
-
-Para forçar um disparo ignorando o cooldown (útil em testes):
+## 2. Criar agendamento via API
 
 ```bash
-curl -X POST "http://localhost:8000/alertas/conexoes_inativas/verificar?forcar=true"
+curl -X POST http://localhost:8099/agendamentos \
+  -H "Content-Type: application/json" \
+  -d '{
+    "usuario_id": 1,
+    "tipo_recurso": "relatorio",
+    "recurso_id": 2,
+    "frequencia": "diaria",
+    "horarios": [{"hora": 7, "minuto": 0}],
+    "apenas_dias_uteis": true,
+    "timezone": "America/Sao_Paulo",
+    "canais": ["whatsapp"],
+    "parametros": {"data_inicio": "{{ontem}}"}
+  }'
 ```
 
-## 6. Pausar uma condição
+Frequências: `diaria` | `semanal` (requer `dia_semana` 1-7) | `mensal` (requer `dia_mes`) | `intervalo` (requer `intervalo_minutos`).
 
-```sql
-UPDATE alertas_condicoes
-SET ativo = FALSE
-WHERE nome = 'Notificar equipe de infra';
+Detalhes de todos os campos: [Agendamentos via API](agendamentos-via-api.md).
+
+## 3. Horários e fuso — como funciona
+
+**Regra única: o horário que você agenda é o horário do `timezone` do agendamento.** Agendou `07:00` com `timezone: America/Sao_Paulo` → dispara às **07:00 de São Paulo**, sempre.
+
+O que acontece por baixo:
+
+```
+Você agenda:          07:00 (America/Sao_Paulo)
+Banco grava:          proximo_envio = 10:00 UTC        ← sempre UTC no banco
+Dispatcher compara:   proximo_envio <= NOW()            ← NOW() também é UTC
+Dispara quando:       10:00 UTC = 07:00 em São Paulo ✓
 ```
 
-Reativar:
+| Onde você vê o horário | Fuso exibido |
+|------------------------|--------------|
+| Coluna `proximo_envio` no banco (SQL direto) | **UTC** (3h à frente de SP) |
+| Respostas da API (`GET /agendamentos`) | Fuso do agendamento (ISO com offset, ex: `07:00:00-03:00`) |
+| Admin Panel | America/Sao_Paulo |
 
-```sql
-UPDATE alertas_condicoes
-SET ativo = TRUE
-WHERE nome = 'Notificar equipe de infra';
+Se você olhar o banco direto e ver `10:00`, **não está errado** — é o mesmo instante que 07:00 SP. Só o banco fala UTC.
+
+- `timezone` é por agendamento (default `America/Sao_Paulo`). Unidades em outro fuso (ex: `America/Cuiaba`) agendam no fuso delas.
+- Horário de verão: `zoneinfo` resolve automaticamente — 07:00 local continua 07:00 local.
+- `frequencia: intervalo` ignora horários e fuso: próxima execução = agora + N minutos.
+
+## 4. Cooldown de alertas
+
+O cooldown evita spam e é **por item** (fingerprint SHA256 da linha): o mesmo item não re-notifica dentro da janela; um item novo dispara na hora. Configurado no `config.json` do alerta (`cooldown_minutos`), aplicado via sync.
+
+O cooldown só conta quando alguma entrega foi criada de fato — disparo sem destinatário ou bloqueado por rate limit não entra em cooldown.
+
+Forçar disparo ignorando cooldown e dedup (só para testes manuais):
+
+```bash
+curl -X POST "http://localhost:8099/alertas/conexoes_inativas/verificar?forcar=true"
 ```
 
-## 7. Consultar condições existentes
+## 5. Pausar e reativar
 
-```sql
-SELECT
-  ac.id,
-  ac.nome AS condicao,
-  a.nome AS alerta,
-  ac.canais,
-  ac.cooldown_minutos,
-  ac.ultimo_disparo,
-  ac.ativo
-FROM alertas_condicoes ac
-JOIN alertas a ON a.id = ac.alerta_id
-ORDER BY a.nome, ac.nome;
+```bash
+# Pausar (soft delete)
+curl -X DELETE http://localhost:8099/agendamentos/5
+
+# Reativar
+curl -X PATCH http://localhost:8099/agendamentos/5 \
+  -H "Content-Type: application/json" -d '{"ativo": true}'
+```
+
+## 6. Consultar agendamentos
+
+```bash
+curl http://localhost:8099/agendamentos            # ativos
+curl "http://localhost:8099/agendamentos?apenas_ativos=false"
 ```
 
 ---
 
 **Ver também**:
-- [Referência — Banco de dados](../referencia/banco-de-dados.md) — esquema da tabela `alertas_condicoes`
-- [Explicação — Renderização de mensagens](../explicacao/renderizacao-mensagens.md)
+- [Agendamentos via API](agendamentos-via-api.md) — referência completa dos campos
+- [Cadastrar destinatários](cadastrar-destinatarios-agendamentos.md)
+- [Referência — Banco de dados](../referencia/banco-de-dados.md)

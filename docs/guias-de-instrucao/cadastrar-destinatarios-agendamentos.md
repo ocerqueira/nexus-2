@@ -113,7 +113,7 @@ Body: {"parametros": {"data_inicio": "2025-01-01", "data_fim": "2025-01-31"}}
 Header: X-Api-Key: <chave>
 ```
 
-Com `notificar=true`, o Nexus cria os despachos no banco e o workflow `nexus_despachos_sender` no n8n entrega.
+Com `notificar=true`, o Nexus cria as entregas no banco e o workflow `nexus_entregas_sender` no n8n entrega.
 
 ---
 
@@ -121,12 +121,12 @@ Com `notificar=true`, o Nexus cria os despachos no banco e o workflow `nexus_des
 
 ### Como funciona
 
-O processador busca no ERP os telefones dos vendedores de cada item afetado (`TELEFONE_VENDEDOR` e `TELEFONE_VENDEDOR2`). Esses números viram despachos **automaticamente**, sem cadastro prévio no Nexus.
+O processador busca no ERP os telefones dos vendedores de cada item afetado (`TELEFONE_VENDEDOR` e `TELEFONE_VENDEDOR2`). Esses números viram entregas **automaticamente**, sem cadastro prévio no Nexus.
 
 ```
 Item com comprimento excedente
-  ├─ TELEFONE_VENDEDOR  → despacho individual para o vendedor
-  └─ TELEFONE_VENDEDOR2 → despacho individual para o assistente
+  ├─ TELEFONE_VENDEDOR  → entrega individual para o vendedor
+  └─ TELEFONE_VENDEDOR2 → entrega individual para o assistente
 ```
 
 Cada vendedor recebe apenas os itens dos seus próprios pedidos (`modo_mensagem: individual`).
@@ -179,11 +179,11 @@ POST /alertas/item_comprimento_excedente/verificar
   ├─ Por item: verifica fingerprint (dedup granular)
   │
   ├─ Destinatários dinâmicos (do ERP)
-  │    └─ telefone_vendedor/assistente → despacho individual por item
+  │    └─ telefone_vendedor/assistente → entrega individual por item
   │
   └─ Destinatários fixos (alertas_destinatarios)
-       ├─ modo consolidado → 1 despacho com resumo de tudo
-       └─ modo individual  → 1 despacho por item
+       ├─ modo consolidado → 1 entrega com resumo de tudo
+       └─ modo individual  → 1 entrega por item
 ```
 
 ---
@@ -196,4 +196,4 @@ Header: X-Api-Key: <chave>
 Body: {"parametros": {"data_inicio": "2025-01-01"}}
 ```
 
-Verificar despachos criados: `GET /despachos/pendentes`
+Verificar entregas criados: `GET /entregas/pendentes`

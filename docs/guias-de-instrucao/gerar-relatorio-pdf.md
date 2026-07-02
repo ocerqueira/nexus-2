@@ -95,7 +95,7 @@ curl -X POST "http://localhost:8000/relatorios/teste_conexoes/solicitar?formato=
 
 ### 404 — Relatório não encontrado
 
-O nome do relatório não existe no dicionário `PROCESSADORES` em `app/rotas/relatorios.py`.
+A pasta `app/relatorios/{nome}/` não existe, falta o `config.json`, ou o `processador.py` não tem uma classe começando com `Processador`. Confira o log de startup — o sincronizador avisa pastas com contrato quebrado.
 
 ### 400 — Parâmetros inválidos
 

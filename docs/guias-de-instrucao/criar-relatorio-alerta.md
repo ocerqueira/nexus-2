@@ -356,7 +356,7 @@ Header: X-Api-Key: <chave>
 Body: {"parametros": {"data_inicio": "2025-01-01"}}
 ```
 
-Verificar despachos criados: `GET /despachos/pendentes`
+Verificar entregas criados: `GET /entregas/pendentes`
 
 ---
 
