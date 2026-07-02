@@ -4,22 +4,40 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "* * * * *" }]
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "* * * * *"
+            }
+          ]
         }
       },
       "id": "schedule",
       "name": "Cron — a cada minuto",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 300]
+      "position": [
+        0,
+        300
+      ]
     },
     {
       "parameters": {
         "mode": "manual",
         "assignments": {
           "assignments": [
-            { "id": "a1", "name": "NEXUS_URL",        "value": "http://192.168.1.100:8000", "type": "string" },
-            { "id": "a2", "name": "NEXUS_API_KEY",    "value": "sua_chave_nexus",           "type": "string" }
+            {
+              "id": "a1",
+              "name": "NEXUS_URL",
+              "value": "http://192.168.1.100:8000",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "NEXUS_API_KEY",
+              "value": "sua_chave_nexus",
+              "type": "string"
+            }
           ]
         },
         "options": {}
@@ -28,7 +46,10 @@
       "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [250, 300]
+      "position": [
+        250,
+        300
+      ]
     },
     {
       "parameters": {
@@ -37,7 +58,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $json.NEXUS_API_KEY }}" }
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $json.NEXUS_API_KEY }}"
+            }
           ]
         },
         "options": {}
@@ -46,18 +70,26 @@
       "name": "GET — proximas-execucoes",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 300]
+      "position": [
+        500,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true },
+          "options": {
+            "caseSensitive": true
+          },
           "conditions": [
             {
               "id": "cond-total",
               "leftValue": "={{ $json.total }}",
               "rightValue": 0,
-              "operator": { "type": "number", "operation": "gt" }
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
             }
           ]
         }
@@ -66,7 +98,10 @@
       "name": "IF — tem_agendamentos?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [750, 300]
+      "position": [
+        750,
+        300
+      ]
     },
     {
       "parameters": {
@@ -77,18 +112,26 @@
       "name": "Split Out — agendamentos",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [1000, 300]
+      "position": [
+        1000,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true },
+          "options": {
+            "caseSensitive": true
+          },
           "conditions": [
             {
               "id": "cond-tipo",
               "leftValue": "={{ $json.tipo_recurso }}",
               "rightValue": "alerta",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -97,16 +140,22 @@
       "name": "Switch — tipo_recurso",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1250, 300]
+      "position": [
+        1250,
+        300
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('Config').first().json.NEXUS_URL + '/alertas/' + $json.recurso_nome + '/verificar?forcar=true' }}",
+        "url": "={{ $('Config').first().json.NEXUS_URL + '/alertas/' + $json.recurso_nome + '/verificar' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" }
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $('Config').first().json.NEXUS_API_KEY }}"
+            }
           ]
         },
         "sendBody": true,
@@ -118,24 +167,39 @@
       "name": "POST — verificar alerta",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1500, 100]
+      "position": [
+        1500,
+        100
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('Config').first().json.NEXUS_URL + '/relatorios/' + $json.recurso_nome + '/solicitar' }}",
+        "url": "={{ $('Config').first().json.NEXUS_URL + '/relatorios/' + $json.recurso_nome + '/solicitar?notificar=true&agendamento_id=' + $json.id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" }
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $('Config').first().json.NEXUS_API_KEY }}"
+            }
           ]
         },
         "sendQueryParameters": true,
         "queryParameters": {
           "parameters": [
-            { "name": "formato",        "value": "json" },
-            { "name": "notificar",      "value": "true" },
-            { "name": "agendamento_id", "value": "={{ $json.id }}" }
+            {
+              "name": "formato",
+              "value": "json"
+            },
+            {
+              "name": "notificar",
+              "value": "true"
+            },
+            {
+              "name": "agendamento_id",
+              "value": "={{ $json.id }}"
+            }
           ]
         },
         "sendBody": true,
@@ -147,16 +211,22 @@
       "name": "POST — solicitar relatorio",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1500, 500]
+      "position": [
+        1500,
+        500
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('Config').first().json.NEXUS_URL + '/agendamentos/' + $('Split Out — agendamentos').first().json.id + '/marcar-executado' }}",
+        "url": "={{ $('Config').first().json.NEXUS_URL + '/agendamentos/' + $('Split Out — agendamentos').item.json.id + '/marcar-executado' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $('Config').first().json.NEXUS_API_KEY }}" }
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $('Config').first().json.NEXUS_API_KEY }}"
+            }
           ]
         },
         "options": {}
@@ -165,39 +235,108 @@
       "name": "POST — marcar-executado",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1750, 300]
+      "position": [
+        1750,
+        300
+      ]
     }
   ],
   "connections": {
     "Cron — a cada minuto": {
-      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Config": {
-      "main": [[{ "node": "GET — proximas-execucoes", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "GET — proximas-execucoes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "GET — proximas-execucoes": {
-      "main": [[{ "node": "IF — tem_agendamentos?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "IF — tem_agendamentos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "IF — tem_agendamentos?": {
       "main": [
-        [{ "node": "Split Out — agendamentos", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Split Out — agendamentos",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Split Out — agendamentos": {
-      "main": [[{ "node": "Switch — tipo_recurso", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Switch — tipo_recurso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Switch — tipo_recurso": {
       "main": [
-        [{ "node": "POST — verificar alerta",   "type": "main", "index": 0 }],
-        [{ "node": "POST — solicitar relatorio", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "POST — verificar alerta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "POST — solicitar relatorio",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "POST — verificar alerta": {
-      "main": [[{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "POST — marcar-executado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "POST — solicitar relatorio": {
-      "main": [[{ "node": "POST — marcar-executado", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "POST — marcar-executado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   }
 }

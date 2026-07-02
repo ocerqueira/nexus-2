@@ -11,20 +11,30 @@
       "name": "Cron — a cada minuto",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 300],
+      "position": [
+        0,
+        300
+      ],
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "* * * * *" }]
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "* * * * *"
+            }
+          ]
         }
       }
     },
-
     {
       "id": "config",
       "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [220, 300],
+      "position": [
+        220,
+        300
+      ],
       "parameters": {
         "mode": "manual",
         "assignments": {
@@ -65,7 +75,12 @@
               "value": "smtp.gmail.com",
               "type": "string"
             },
-            { "id": "a7", "name": "SMTP_PORT", "value": 587, "type": "number" },
+            {
+              "id": "a7",
+              "name": "SMTP_PORT",
+              "value": 587,
+              "type": "number"
+            },
             {
               "id": "a8",
               "name": "SMTP_USER",
@@ -89,32 +104,39 @@
         "options": {}
       }
     },
-
     {
       "id": "get-pendentes",
       "name": "GET — entregas/pendentes",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 300],
+      "position": [
+        440,
+        300
+      ],
       "parameters": {
         "method": "GET",
         "url": "={{ $json.NEXUS_URL }}/entregas/pendentes?limite=50&incluir_retry=true",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $json.NEXUS_API_KEY }}" }
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $json.NEXUS_API_KEY }}"
+            }
           ]
         },
         "options": {}
       }
     },
-
     {
       "id": "if-tem",
       "name": "IF — tem entregas?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [660, 300],
+      "position": [
+        660,
+        300
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -127,7 +149,10 @@
               "id": "c1",
               "leftValue": "={{ $json.total }}",
               "rightValue": 0,
-              "operator": { "type": "number", "operation": "gt" }
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
             }
           ],
           "combinator": "and"
@@ -135,25 +160,29 @@
         "options": {}
       }
     },
-
     {
       "id": "split",
       "name": "Split Out — entregas",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [880, 300],
+      "position": [
+        880,
+        300
+      ],
       "parameters": {
         "fieldToSplitOut": "entregas",
         "options": {}
       }
     },
-
     {
       "id": "if-canal-wp",
       "name": "IF — canal whatsapp?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1100, 300],
+      "position": [
+        1100,
+        300
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -166,7 +195,10 @@
               "id": "c1",
               "leftValue": "={{ $json.canal }}",
               "rightValue": "whatsapp",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -174,13 +206,15 @@
         "options": {}
       }
     },
-
     {
       "id": "if-tipo-pdf",
       "name": "IF — tipo pdf?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1320, 180],
+      "position": [
+        1320,
+        180
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -193,7 +227,10 @@
               "id": "c1",
               "leftValue": "={{ $json.payload.tipo }}",
               "rightValue": "pdf",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -201,13 +238,15 @@
         "options": {}
       }
     },
-
     {
       "id": "evo-sendmedia",
       "name": "Evolution — sendMedia",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, 80],
+      "position": [
+        1540,
+        80
+      ],
       "continueOnFail": true,
       "parameters": {
         "method": "POST",
@@ -224,16 +263,20 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ number: $json.destino, mediatype: 'document', mimetype: 'application/pdf', media: $json.payload.pdf_base64, fileName: ($json.relatorio_nome || $json.alerta_nome || 'nexus') + '.pdf', text: $json.payload.text || 'Documento' }) }}",
-        "options": { "allowUnauthorizedCerts": true }
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
       }
     },
-
     {
       "id": "evo-sendtext",
       "name": "Evolution — sendText",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, 280],
+      "position": [
+        1540,
+        280
+      ],
       "continueOnFail": true,
       "parameters": {
         "method": "POST",
@@ -250,27 +293,33 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ number: $json.destino, text: $json.payload.mensagem }) }}",
-        "options": { "allowUnauthorizedCerts": true }
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
       }
     },
-
     {
       "id": "code-email",
       "name": "Code — preparar email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, 420],
+      "position": [
+        1320,
+        420
+      ],
       "parameters": {
-        "jsCode": "const d = $input.first().json;\nconst p = d.payload || {};\nconst temPdf = !!(p.pdf_base64);\nreturn [{\n  json: {\n    ...d,\n    _assunto:      p.assunto  || 'Nexus: ' + (d.relatorio_nome || d.alerta_nome || 'Notificação'),\n    _html:         '<p>' + (p.resumo || '') + '</p>',\n    _tem_pdf:      temPdf,\n    _pdf_filename: (d.relatorio_nome || d.alerta_nome || 'relatorio') + '.pdf',\n    _pdf_data:     temPdf ? p.pdf_base64 : null\n  },\n  pairedItem: { item: 0 }\n}];"
+        "jsCode": "const d = $input.first().json;\nconst p = d.payload || {};\nconst temPdf = !!(p.pdf_base64);\nreturn [{\n  json: {\n    ...d,\n    _assunto:      p.assunto  || 'Nexus: ' + (d.relatorio_nome || d.alerta_nome || 'Notificação'),\n    _html:         p.html || ('<p>' + (p.resumo || '') + '</p>'),\n    _tem_pdf:      temPdf,\n    _pdf_filename: (d.relatorio_nome || d.alerta_nome || 'relatorio') + '.pdf',\n    _pdf_data:     temPdf ? p.pdf_base64 : null\n  },\n  pairedItem: { item: 0 }\n}];"
       }
     },
-
     {
       "id": "smtp-send",
       "name": "SMTP — enviar email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 1,
-      "position": [1540, 420],
+      "position": [
+        1540,
+        420
+      ],
       "continueOnFail": true,
       "parameters": {
         "fromEmail": "={{ $('Config').first().json.SMTP_FROM_NAME + ' <' + $('Config').first().json.SMTP_USER + '>' }}",
@@ -287,24 +336,28 @@
         }
       }
     },
-
     {
       "id": "code-resultado",
       "name": "Code — avaliar resultado",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1780, 280],
+      "position": [
+        1780,
+        280
+      ],
       "parameters": {
         "jsCode": "const item = $input.first();\n\nlet entregaId = null;\nlet tentativasAnterior = 0;\ntry {\n  const original = $('Split Out — entregas').item.json;\n  entregaId = original.id;\n  tentativasAnterior = original.tentativas || 0;\n} catch(e) {}\n\n// Evolution usa 'status', n8n usa 'statusCode' — checar ambos\nconst statusCode = item.json?.statusCode ?? item.json?.status ?? 200;\nconst temErro = !!item.json?.error ||\n                (typeof statusCode === 'number' && statusCode >= 400);\nconst sucesso = !temErro;\n\nconst erroMsg = temErro\n  ? String(item.json?.error?.message || item.json?.error || item.json?.message || 'HTTP ' + statusCode)\n  : null;\n\nreturn [{\n  json: {\n    entrega_id: entregaId,\n    status:      sucesso ? 'enviado' : 'falhou',\n    erro:        erroMsg,\n    tentativas:  tentativasAnterior + 1\n  }\n}];"
       }
     },
-
     {
       "id": "if-tem-id",
       "name": "IF — tem entrega_id?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [2000, 280],
+      "position": [
+        2000,
+        280
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -317,7 +370,10 @@
               "id": "c1",
               "leftValue": "={{ $json.entrega_id }}",
               "rightValue": 0,
-              "operator": { "type": "number", "operation": "gt" }
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
             }
           ],
           "combinator": "and"
@@ -325,13 +381,15 @@
         "options": {}
       }
     },
-
     {
       "id": "patch-status",
       "name": "PATCH — entregas status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2220, 200],
+      "position": [
+        2220,
+        200
+      ],
       "parameters": {
         "method": "PATCH",
         "url": "={{ $('Config').first().json.NEXUS_URL + '/entregas/' + $json.entrega_id + '/status' }}",
@@ -342,7 +400,10 @@
               "name": "X-Api-Key",
               "value": "={{ $('Config').first().json.NEXUS_API_KEY }}"
             },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -352,64 +413,163 @@
       }
     }
   ],
-
   "connections": {
     "Cron — a cada minuto": {
-      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Config": {
       "main": [
-        [{ "node": "GET — entregas/pendentes", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "GET — entregas/pendentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "GET — entregas/pendentes": {
-      "main": [[{ "node": "IF — tem entregas?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "IF — tem entregas?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "IF — tem entregas?": {
       "main": [
-        [{ "node": "Split Out — entregas", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Split Out — entregas",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Split Out — entregas": {
-      "main": [[{ "node": "IF — canal whatsapp?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "IF — canal whatsapp?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "IF — canal whatsapp?": {
       "main": [
-        [{ "node": "IF — tipo pdf?", "type": "main", "index": 0 }],
-        [{ "node": "Code — preparar email", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "IF — tipo pdf?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code — preparar email",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "IF — tipo pdf?": {
       "main": [
-        [{ "node": "Evolution — sendMedia", "type": "main", "index": 0 }],
-        [{ "node": "Evolution — sendText", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Evolution — sendMedia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Evolution — sendText",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Evolution — sendMedia": {
       "main": [
-        [{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Code — avaliar resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Evolution — sendText": {
       "main": [
-        [{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Code — avaliar resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Code — preparar email": {
-      "main": [[{ "node": "SMTP — enviar email", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "SMTP — enviar email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "SMTP — enviar email": {
       "main": [
-        [{ "node": "Code — avaliar resultado", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Code — avaliar resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Code — avaliar resultado": {
-      "main": [[{ "node": "IF — tem entrega_id?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "IF — tem entrega_id?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "IF — tem entrega_id?": {
       "main": [
-        [{ "node": "PATCH — entregas status", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "PATCH — entregas status",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     }

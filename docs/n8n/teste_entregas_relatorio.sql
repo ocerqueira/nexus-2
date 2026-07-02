@@ -1,13 +1,13 @@
 -- Despachos de teste para relatórios (schema real: alerta_id/relatorio_id)
 -- usuario_id=2 (Lucas Cerqueira), relatorio_id=4 (pedidos_por_vendedor)
 
--- Reset despachos anteriores que falharam
-UPDATE despachos
+-- Reset entregas anteriores que falharam
+UPDATE entregas
 SET status = 'pendente', tentativas = 0, ultimo_erro = NULL
 WHERE status = 'falhou';
 
 -- 1. WP texto (resumo do relatório)
-INSERT INTO despachos (relatorio_id, usuario_id, canal, destino, payload, status)
+INSERT INTO entregas (relatorio_id, usuario_id, canal, destino, payload, status)
 VALUES (
   4,
   2,
@@ -21,7 +21,7 @@ VALUES (
 );
 
 -- 2. Email HTML (usa email hardcoded pois usuarios não têm email no banco local)
-INSERT INTO despachos (relatorio_id, usuario_id, canal, destino, payload, status)
+INSERT INTO entregas (relatorio_id, usuario_id, canal, destino, payload, status)
 VALUES (
   4,
   2,
@@ -36,5 +36,5 @@ VALUES (
 
 -- Confirma estado final
 SELECT id, relatorio_id, alerta_id, canal, destino, status, tentativas
-FROM despachos
+FROM entregas
 ORDER BY id;

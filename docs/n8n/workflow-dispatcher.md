@@ -21,7 +21,7 @@
               ▼
        [Loop: para cada agendamento]
               │
-              ├── tipo_recurso = "relatorio" ──▶ POST /relatorios/{nome}/solicitar?formato=pdf
+              ├── tipo_recurso = "relatorio" ──▶ POST /relatorios/{nome}/solicitar?notificar=true&agendamento_id={id}
               │                                        │
               │                                        └── anexa PDF no email
               │
@@ -117,7 +117,7 @@
 
 - **Tipo:** HTTP Request
 - **Método:** POST
-- **URL:** `{{ $json.NEXUS_URL }}/relatorios/{{ $json.recurso_nome }}/solicitar`
+- **URL:** `{{ $json.NEXUS_URL }}/relatorios/{{ $json.recurso_nome }}/solicitar?notificar=true&agendamento_id={{ $json.id }}`
 - **Query:** `?formato=pdf`
 - **Body (JSON):**
 ```json
@@ -148,16 +148,16 @@
   "resumo": "3 itens com comprimento excedente",
   "total_encontrado": 3,
   "itens_notificados": 3,
-  "despachos": [
+  "entregas": [
     {"id": 1, "status": "pendente", "canal": "whatsapp", "destino": "5511999999999", "destinatario": "João", "enviar_apos": null},
     {"id": 2, "status": "pendente", "canal": "whatsapp", "destino": "5511988888888", "destinatario": "Maria", "enviar_apos": null}
   ],
-  "despachos_bloqueados_rate_limit": 0,
+  "entregas_bloqueados_rate_limit": 0,
   "historico_id": 42
 }
 ```
 
-> **Importante:** O Nexus cria os despachos internamente. O dispatcher **não** precisa fazer loop de destinatários nem chamar a Evolution API — isso é responsabilidade do `nexus_despachos_sender`. O dispatcher apenas chama `/verificar` e depois `/marcar-executado`.
+> **Importante:** O Nexus cria as entregas internamente. O dispatcher **não** precisa fazer loop de destinatários nem chamar a Evolution API — isso é responsabilidade do `nexus_entregas_sender`. O dispatcher apenas chama `/verificar` e depois `/marcar-executado`.
 
 ---
 
@@ -171,7 +171,7 @@
 
 ### 8. Enviar notificações
 
-> **Arquitetura:** para **alertas**, o Nexus já criou os despachos internamente. O dispatcher apenas confirma a execução via `marcar-executado`. A entrega real (Evolution/SMTP) é feita pelo `nexus_despachos_sender` em paralelo.
+> **Arquitetura:** para **alertas**, o Nexus já criou as entregas internamente. O dispatcher apenas confirma a execução via `marcar-executado`. A entrega real (Evolution/SMTP) é feita pelo `nexus_entregas_sender` em paralelo.
 >
 > Para **relatórios**, o dispatcher ainda executa o envio direto (PDF via Evolution ou SMTP).
 
@@ -275,7 +275,7 @@ Se for enviar o PDF do relatório como anexo via WhatsApp:
 | Ordem | Método | Endpoint | Quando |
 |-------|--------|----------|--------|
 | 1 | GET | `/agendamentos/proximas-execucoes` | Toda execução (1/min) |
-| 2a | POST | `/relatorios/{nome}/solicitar?formato=pdf` | Se `tipo_recurso = relatorio` |
+| 2a | POST | `/relatorios/{nome}/solicitar?notificar=true&agendamento_id={id}` | Se `tipo_recurso = relatorio` — cria entregas p/ destinatários |
 | 2b | POST | `/alertas/{nome}/verificar` | Se `tipo_recurso = alerta` |
 | 3 | POST | `/agendamentos/{id}/marcar-executado` | Após envio concluído |
 
@@ -305,7 +305,7 @@ Se for enviar o PDF do relatório como anexo via WhatsApp:
         │                                │
         ▼                                ▼
 [POST /alertas/{nome}/            [POST /relatorios/{nome}/
- verificar?forcar=true]            solicitar?formato=pdf]
+ verificar]                        solicitar?notificar=true]
         │                                │
         ▼                                ▼
 [IF: deve_notificar?]              [Code: PDF base64]
